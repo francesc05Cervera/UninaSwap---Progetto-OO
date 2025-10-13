@@ -7,7 +7,8 @@ public enum StatoOfferta {
 
     private final String dbValue;
 
-    StatoOfferta(String dbValue) {
+    StatoOfferta(String dbValue) 
+    {
         this.dbValue = dbValue;
     }
 
