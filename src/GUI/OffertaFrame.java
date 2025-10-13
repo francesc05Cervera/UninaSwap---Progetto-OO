@@ -15,7 +15,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
 
-public class OffertaFrame extends JFrame {
+public class OffertaFrame extends JFrame 
+{
     private OffertaController offertaController;
     private AnnuncioController annuncioController;
     private JTable tabellaOfferteInviate, tabellaOfferteRicevute;
