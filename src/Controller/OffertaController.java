@@ -1,18 +1,15 @@
 package Controller;
-
 import DAO.OffertaDAO;
 import DAO.AnnuncioDAO;
 import entità.Offerta;
 import entità.Annuncio;
 import entity.enums.StatoOfferta;
 import entity.enums.TipoAnnuncio;
-
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 
 public class OffertaController {
-
     private OffertaDAO offertaDAO;
     private AnnuncioDAO annuncioDAO;
 
@@ -22,11 +19,9 @@ public class OffertaController {
     }
 
     // Creazione di una nuova offerta
-    public boolean creaOfferta(LocalDate data, TipoAnnuncio tipo, double prezzoProposto,
-                               String oggetti, String messaggio, String username, int idAnnuncio, String comeConsegnare) {
+    public boolean creaOfferta(LocalDate data, TipoAnnuncio tipo, double prezzoProposto, String oggetti, String messaggio, String username, int idAnnuncio, String comeConsegnare) {
         try {
             Annuncio annuncio = annuncioDAO.findByID(idAnnuncio);
-
             if (annuncio == null || !annuncio.isDisponibile()) {
                 System.out.println("Annuncio non valido o non disponibile.");
                 return false;
@@ -49,7 +44,6 @@ public class OffertaController {
                 return true;
             }
             return false;
-
         } catch (SQLException ex) {
             ex.printStackTrace();
             return false;
@@ -85,7 +79,6 @@ public class OffertaController {
 
             System.out.println("Offerta accettata e annuncio chiuso.");
             return true;
-
         } catch (SQLException ex) {
             ex.printStackTrace();
             return false;

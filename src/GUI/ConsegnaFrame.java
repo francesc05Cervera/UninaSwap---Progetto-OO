@@ -1,70 +1,92 @@
 package GUI;
 
 import Controller.ConsegnaController;
+import Controller.AnnuncioController;
 import entità.Consegna;
+import entità.Annuncio;
 import entity.enums.TipoConsegna;
 import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class ConsegnaFrame extends JFrame {
     private ConsegnaController controller;
+    private AnnuncioController annuncioController;
     private JTable tableRicevute, tableInviate;
     private DefaultTableModel modelRicevute, modelInviate;
-    private JButton btnModificaRic, btnDettagliRic, btnAggiornaRic;
-    private JButton btnModificaInv, btnDettagliInv, btnAggiornaInv;
     private JButton btnIndietro;
     private String usernameUtente;
 
     public ConsegnaFrame(String usernameUtente) {
         this.usernameUtente = usernameUtente;
         this.controller = new ConsegnaController();
+        this.annuncioController = new AnnuncioController();
 
-        // Configurazione finestra
         setTitle("Gestione Consegne - Unina Swap");
-        setSize(1200, 700);
+        setSize(1300, 750);
+        setMinimumSize(new Dimension(1200, 700));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        // Panel principale con split
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 0));
+        mainPanel.setBackground(new Color(240, 242, 245));
 
-        // Titolo
-        JLabel lblTitle = new JLabel("Gestione Consegne", SwingConstants.CENTER);
-        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 20));
-        mainPanel.add(lblTitle, BorderLayout.NORTH);
+        // Header
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(220, 220, 220)),
+            BorderFactory.createEmptyBorder(20, 30, 20, 30)
+        ));
 
-        // Split panel per le due sezioni
+        JLabel lblTitle = new JLabel("Gestione Consegne");
+        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 26));
+        lblTitle.setForeground(new Color(255, 193, 7));
+        lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerPanel.add(lblTitle);
+
+        headerPanel.add(Box.createVerticalStrut(5));
+
+        JLabel lblSubtitle = new JLabel("Gestisci le tue consegne in entrata e in uscita");
+        lblSubtitle.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        lblSubtitle.setForeground(new Color(100, 100, 100));
+        lblSubtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerPanel.add(lblSubtitle);
+
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+
+        // Split panel
+        JPanel centerWrapper = new JPanel(new BorderLayout());
+        centerWrapper.setBackground(new Color(240, 242, 245));
+        centerWrapper.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPane.setDividerLocation(590);
+        splitPane.setDividerLocation(640);
         splitPane.setResizeWeight(0.5);
+        splitPane.setDividerSize(8);
+        splitPane.setBorder(null);
 
-        // ===== PANEL CONSEGNE DA RICEVERE =====
-        JPanel panelRicevute = creaPanelConsegne(
-            "Consegne da Ricevere",
-            "Annunci che hai acquistato",
-            true
-        );
-        splitPane.setLeftComponent(panelRicevute);
+        splitPane.setLeftComponent(creaPanelConsegne("Consegne da Ricevere", "Annunci che hai acquistato", new Color(40, 167, 69), true));
+        splitPane.setRightComponent(creaPanelConsegne("Consegne da Inviare", "Annunci che ti hanno acquistato", new Color(0, 102, 204), false));
 
-        // ===== PANEL CONSEGNE DA INVIARE =====
-        JPanel panelInviate = creaPanelConsegne(
-            "Consegne da Inviare",
-            "Annunci che ti hanno acquistato",
-            false
-        );
-        splitPane.setRightComponent(panelInviate);
+        centerWrapper.add(splitPane, BorderLayout.CENTER);
+        mainPanel.add(centerWrapper, BorderLayout.CENTER);
 
-        mainPanel.add(splitPane, BorderLayout.CENTER);
-
-        // Pulsante Indietro
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        btnIndietro = new JButton("Indietro");
+        // Bottom
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 15));
+        bottomPanel.setBackground(Color.WHITE);
+        bottomPanel.setBorder(BorderFactory.createMatteBorder(2, 0, 0, 0, new Color(220, 220, 220)));
+        
+        btnIndietro = createStyledButton("Indietro", new Color(108, 117, 125));
         btnIndietro.addActionListener(e -> {
             dispose();
             new MenuFrame(usernameUtente);
@@ -73,44 +95,66 @@ public class ConsegnaFrame extends JFrame {
         mainPanel.add(bottomPanel, BorderLayout.SOUTH);
 
         add(mainPanel);
-
-        // Carica le consegne
         caricaConsegne();
-
         setVisible(true);
     }
 
-    private JPanel creaPanelConsegne(String titolo, String sottotitolo, boolean isRicevute) {
-        JPanel panel = new JPanel(new BorderLayout(5, 5));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    private JPanel creaPanelConsegne(String titolo, String sottotitolo, Color themeColor, boolean isRicevute) {
+        JPanel panel = new JPanel(new BorderLayout(0, 0));
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220), 1));
 
-        // Header
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        JLabel lblTitolo = new JLabel(titolo, SwingConstants.CENTER);
-        lblTitolo.setFont(new Font("SansSerif", Font.BOLD, 16));
-        JLabel lblSottotitolo = new JLabel(sottotitolo, SwingConstants.CENTER);
-        lblSottotitolo.setFont(new Font("SansSerif", Font.ITALIC, 12));
-        lblSottotitolo.setForeground(Color.GRAY);
-        headerPanel.add(lblTitolo, BorderLayout.NORTH);
-        headerPanel.add(lblSottotitolo, BorderLayout.CENTER);
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(themeColor);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        JLabel lblTitolo = new JLabel(titolo);
+        lblTitolo.setFont(new Font("SansSerif", Font.BOLD, 18));
+        lblTitolo.setForeground(Color.WHITE);
+        lblTitolo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerPanel.add(lblTitolo);
+
+        headerPanel.add(Box.createVerticalStrut(5));
+
+        JLabel lblSottotitolo = new JLabel(sottotitolo);
+        lblSottotitolo.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        lblSottotitolo.setForeground(new Color(255, 255, 255, 200));
+        lblSottotitolo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerPanel.add(lblSottotitolo);
+
         panel.add(headerPanel, BorderLayout.NORTH);
 
-        // Tabella
-        String[] colonne = {"ID", "Destinatario", "Tipo", "Data", "ID Ann."};
+        String[] colonne = {"ID", "Destinatario", "Tipo", "Data", "Titolo Annuncio"};
         DefaultTableModel model = new DefaultTableModel(colonne, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+            public boolean isCellEditable(int row, int column) { return false; }
         };
 
         JTable table = new JTable(model);
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.setRowHeight(32);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setSelectionBackground(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 50));
+        table.setSelectionForeground(Color.BLACK);
+        table.setGridColor(new Color(230, 230, 230));
+
         table.getColumnModel().getColumn(0).setPreferredWidth(40);
         table.getColumnModel().getColumn(1).setPreferredWidth(120);
-        table.getColumnModel().getColumn(2).setPreferredWidth(80);
-        table.getColumnModel().getColumn(3).setPreferredWidth(80);
-        table.getColumnModel().getColumn(4).setPreferredWidth(50);
+        table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        table.getColumnModel().getColumn(3).setPreferredWidth(90);
+        table.getColumnModel().getColumn(4).setPreferredWidth(150);
+
+        JTableHeader header = table.getTableHeader();
+        header.setFont(new Font("SansSerif", Font.BOLD, 13));
+        header.setBackground(themeColor);
+        header.setForeground(Color.WHITE);
+        header.setPreferredSize(new Dimension(header.getWidth(), 35));
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for (int i = 0; i < 5; i++) {
+            if (i != 1) table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
 
         if (isRicevute) {
             tableRicevute = table;
@@ -121,70 +165,78 @@ public class ConsegnaFrame extends JFrame {
         }
 
         JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(null);
         panel.add(scrollPane, BorderLayout.CENTER);
 
-        // Pulsanti
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
-        JButton btnModifica = new JButton("Modifica");
-        JButton btnDettagli = new JButton("Dettagli");
-        JButton btnAggiorna = new JButton("Aggiorna");
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 12));
+        buttonPanel.setBackground(new Color(250, 250, 250));
+        buttonPanel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(220, 220, 220)));
 
-        buttonPanel.add(btnModifica);
-        buttonPanel.add(btnDettagli);
-        buttonPanel.add(btnAggiorna);
+        JButton btnDettagli = createSmallButton("Dettagli", new Color(108, 117, 125));
+        JButton btnAggiorna = createSmallButton("Aggiorna", new Color(108, 117, 125));
 
-        if (isRicevute) {
-            btnModificaRic = btnModifica;
-            btnDettagliRic = btnDettagli;
-            btnAggiornaRic = btnAggiorna;
+        btnDettagli.addActionListener(e -> visualizzaDettagli(isRicevute));
+        btnAggiorna.addActionListener(e -> caricaConsegne());
 
-            btnModificaRic.addActionListener(e -> modificaConsegna(true));
-            btnDettagliRic.addActionListener(e -> visualizzaDettagli(true));
-            btnAggiornaRic.addActionListener(e -> caricaConsegne());
-        } else {
-            btnModificaInv = btnModifica;
-            btnDettagliInv = btnDettagli;
-            btnAggiornaInv = btnAggiorna;
-
-            btnModificaInv.addActionListener(e -> modificaConsegna(false));
-            btnDettagliInv.addActionListener(e -> visualizzaDettagli(false));
-            btnAggiornaInv.addActionListener(e -> caricaConsegne());
+        // Aggiungi il bottone Modifica SOLO per le consegne da inviare
+        if (!isRicevute) {
+            JButton btnModifica = createSmallButton("Modifica", themeColor);
+            btnModifica.addActionListener(e -> modificaConsegna(false));
+            buttonPanel.add(btnModifica);
         }
 
+        buttonPanel.add(btnDettagli);
+        buttonPanel.add(btnAggiorna);
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
         return panel;
     }
 
+    private JButton createStyledButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("SansSerif", Font.BOLD, 13));
+        button.setBackground(color);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { button.setBackground(color.darker()); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { button.setBackground(color); }
+        });
+        return button;
+    }
+
+    private JButton createSmallButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("SansSerif", Font.BOLD, 12));
+        button.setBackground(color);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { button.setBackground(color.darker()); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { button.setBackground(color); }
+        });
+        return button;
+    }
+
     private void caricaConsegne() {
         modelRicevute.setRowCount(0);
         modelInviate.setRowCount(0);
-        
         List<Consegna> tutte = controller.listaTutteConsegne();
-
-        if (tutte != null && !tutte.isEmpty()) {
+        if (tutte != null) {
             for (Consegna c : tutte) {
-                Object[] row = new Object[]{
-                    c.getIdConsegna(),
-                    c.getDestinatario(),
-                    c.getTipoConsegna().toString(),
-                    c.getData(),
-                    c.getIdAnnuncio()
-                };
-
-                // TODO: Implementa la logica per distinguere se l'annuncio è dell'utente o no
-                // Per ora mettiamo tutto in "da ricevere" come esempio
-                // Dovresti verificare se l'annuncio appartiene all'utente loggato
-                
-                // ESEMPIO: Se l'utente è il venditore -> consegne da inviare
-                // Se l'utente è l'acquirente -> consegne da ricevere
-                
-                // Placeholder: metti metà e metà per test
-                if (c.getIdConsegna() % 2 == 0) {
-                    modelRicevute.addRow(row);
-                } else {
-                    modelInviate.addRow(row);
-                }
+                try {
+                    Annuncio ann = annuncioController.cercaPerId(c.getIdAnnuncio());
+                    if (ann != null) {
+                        // Usa il titolo dell'annuncio invece dell'ID
+                        Object[] row = {c.getIdConsegna(), c.getDestinatario(), c.getTipoConsegna(), c.getData(), ann.getTitolo()};
+                        if (ann.getUsername().equals(usernameUtente)) modelInviate.addRow(row);
+                        else if (c.getDestinatario().equals(usernameUtente)) modelRicevute.addRow(row);
+                    }
+                } catch (Exception ex) {}
             }
         }
     }
@@ -195,196 +247,272 @@ public class ConsegnaFrame extends JFrame {
         int selectedRow = table.getSelectedRow();
         
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this,
-                "Seleziona una consegna dalla tabella.",
-                "Attenzione",
-                JOptionPane.WARNING_MESSAGE);
+            showMsg("Seleziona una consegna dalla tabella", "Nessuna selezione", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         int idConsegna = (int) model.getValueAt(selectedRow, 0);
-        
         List<Consegna> tutte = controller.listaTutteConsegne();
-        Consegna consegna = tutte.stream()
-            .filter(c -> c.getIdConsegna() == idConsegna)
-            .findFirst()
-            .orElse(null);
+        Consegna consegna = tutte.stream().filter(c -> c.getIdConsegna() == idConsegna).findFirst().orElse(null);
 
         if (consegna == null) {
-            JOptionPane.showMessageDialog(this, "Consegna non trovata.", 
-                "Errore", JOptionPane.ERROR_MESSAGE);
+            showMsg("Consegna non trovata nel sistema", "Errore", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         JDialog dialog = new JDialog(this, "Modifica Consegna", true);
-        dialog.setSize(500, 600);
+        dialog.setSize(550, 750);
         dialog.setLocationRelativeTo(this);
 
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+
+        // Header
+        JPanel headerPanel = new JPanel();
+        headerPanel.setBackground(new Color(255, 193, 7));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        JLabel headerLabel = new JLabel("Modifica Dettagli Consegna");
+        headerLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+        headerLabel.setForeground(Color.WHITE);
+        headerPanel.add(headerLabel);
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+
+        // Form
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setBackground(Color.WHITE);
+        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 25, 20, 25));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.insets = new Insets(8, 5, 8, 5);
 
-        JTextField txtDestinatario = new JTextField(consegna.getDestinatario(), 20);
+        JTextField txtDestinatario = createTextField(consegna.getDestinatario());
         JTextArea txtNote = new JTextArea(consegna.getNoteConsegna(), 3, 20);
+        txtNote.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        txtNote.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
         JScrollPane scrollNote = new JScrollPane(txtNote);
+
         JComboBox<TipoConsegna> cmbTipo = new JComboBox<>(TipoConsegna.values());
+        cmbTipo.setFont(new Font("SansSerif", Font.PLAIN, 13));
         cmbTipo.setSelectedItem(consegna.getTipoConsegna());
         
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
         
-        JTextField txtData = new JTextField(consegna.getData().format(dateFormatter), 20);
-        JTextField txtOraInizio = new JTextField(
-            consegna.getOraInizioPref() != null ? consegna.getOraInizioPref().format(timeFormatter) : "", 20);
-        JTextField txtOraFine = new JTextField(
-            consegna.getOraFinePref() != null ? consegna.getOraFinePref().format(timeFormatter) : "", 20);
-
-        JTextField txtSedeUni = new JTextField(consegna.getSedeUniversitaria() != null ? consegna.getSedeUniversitaria() : "", 20);
-        JTextField txtIndirizzo = new JTextField(consegna.getIndirizzo() != null ? consegna.getIndirizzo() : "", 20);
-        JTextField txtCivico = new JTextField(consegna.getCivico() != null ? consegna.getCivico() : "", 20);
-        JTextField txtCorriere = new JTextField(consegna.getCorriere() != null ? consegna.getCorriere() : "", 20);
-        JTextField txtTracking = new JTextField(consegna.getTrackingNumber() != null ? consegna.getTrackingNumber() : "", 20);
+        JTextField txtData = createTextField(consegna.getData().format(dateFormatter));
+        JTextField txtOraInizio = createTextField(consegna.getOraInizioPref() != null ? consegna.getOraInizioPref().format(timeFormatter) : "");
+        JTextField txtOraFine = createTextField(consegna.getOraFinePref() != null ? consegna.getOraFinePref().format(timeFormatter) : "");
+        JTextField txtSedeUni = createTextField(consegna.getSedeUniversitaria() != null ? consegna.getSedeUniversitaria() : "");
+        JTextField txtIndirizzo = createTextField(consegna.getIndirizzo() != null ? consegna.getIndirizzo() : "");
+        JTextField txtCivico = createTextField(consegna.getCivico() != null ? consegna.getCivico() : "");
+        JTextField txtCorriere = createTextField(consegna.getCorriere() != null ? consegna.getCorriere() : "");
+        JTextField txtTracking = createTextField(consegna.getTrackingNumber() != null ? consegna.getTrackingNumber() : "");
 
         JPanel campiDinamici = new JPanel(new GridBagLayout());
+        campiDinamici.setBackground(Color.WHITE);
         
         cmbTipo.addActionListener(e -> {
             campiDinamici.removeAll();
             GridBagConstraints gbcDin = new GridBagConstraints();
             gbcDin.fill = GridBagConstraints.HORIZONTAL;
             gbcDin.insets = new Insets(5, 5, 5, 5);
-            gbcDin.gridx = 0;
-            gbcDin.gridy = 0;
+            gbcDin.gridx = 0; gbcDin.gridy = 0;
 
             if (cmbTipo.getSelectedItem() == TipoConsegna.A_MANO) {
-                campiDinamici.add(new JLabel("Sede Universitaria:"), gbcDin);
+                campiDinamici.add(createLabel("Sede Universitaria*:"), gbcDin);
                 gbcDin.gridx = 1;
                 campiDinamici.add(txtSedeUni, gbcDin);
             } else if (cmbTipo.getSelectedItem() == TipoConsegna.SPEDIZIONE) {
-                campiDinamici.add(new JLabel("Indirizzo:"), gbcDin);
+                campiDinamici.add(createLabel("Indirizzo*:"), gbcDin);
                 gbcDin.gridx = 1;
                 campiDinamici.add(txtIndirizzo, gbcDin);
                 
-                gbcDin.gridx = 0;
-                gbcDin.gridy = 1;
-                campiDinamici.add(new JLabel("Civico:"), gbcDin);
+                gbcDin.gridx = 0; gbcDin.gridy = 1;
+                campiDinamici.add(createLabel("Civico*:"), gbcDin);
                 gbcDin.gridx = 1;
                 campiDinamici.add(txtCivico, gbcDin);
                 
-                gbcDin.gridx = 0;
-                gbcDin.gridy = 2;
-                campiDinamici.add(new JLabel("Corriere (opzionale):"), gbcDin);
+                gbcDin.gridx = 0; gbcDin.gridy = 2;
+                campiDinamici.add(createLabel("Corriere:"), gbcDin);
                 gbcDin.gridx = 1;
                 campiDinamici.add(txtCorriere, gbcDin);
                 
-                gbcDin.gridx = 0;
-                gbcDin.gridy = 3;
-                campiDinamici.add(new JLabel("Tracking (opzionale):"), gbcDin);
+                gbcDin.gridx = 0; gbcDin.gridy = 3;
+                campiDinamici.add(createLabel("Tracking:"), gbcDin);
                 gbcDin.gridx = 1;
                 campiDinamici.add(txtTracking, gbcDin);
             }
-            
             campiDinamici.revalidate();
             campiDinamici.repaint();
         });
 
         int row = 0;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Destinatario*:"), gbc);
+        formPanel.add(createLabel("Destinatario*:"), gbc);
         gbc.gridx = 1;
-        panel.add(txtDestinatario, gbc);
+        formPanel.add(txtDestinatario, gbc);
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Tipo Consegna*:"), gbc);
+        formPanel.add(createLabel("Tipo Consegna*:"), gbc);
         gbc.gridx = 1;
-        panel.add(cmbTipo, gbc);
+        formPanel.add(cmbTipo, gbc);
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
         gbc.gridwidth = 2;
-        panel.add(campiDinamici, gbc);
+        formPanel.add(campiDinamici, gbc);
         gbc.gridwidth = 1;
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Data (yyyy-MM-dd)*:"), gbc);
+        formPanel.add(createLabel("Data (yyyy-MM-dd)*:"), gbc);
         gbc.gridx = 1;
-        panel.add(txtData, gbc);
+        formPanel.add(txtData, gbc);
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Ora Inizio (HH:mm):"), gbc);
+        formPanel.add(createLabel("Ora Inizio (HH:mm):"), gbc);
         gbc.gridx = 1;
-        panel.add(txtOraInizio, gbc);
+        formPanel.add(txtOraInizio, gbc);
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Ora Fine (HH:mm):"), gbc);
+        formPanel.add(createLabel("Ora Fine (HH:mm):"), gbc);
         gbc.gridx = 1;
-        panel.add(txtOraFine, gbc);
+        formPanel.add(txtOraFine, gbc);
 
         row++;
         gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Note:"), gbc);
+        formPanel.add(createLabel("Note:"), gbc);
         gbc.gridx = 1;
-        panel.add(scrollNote, gbc);
-
-        row++;
-        gbc.gridx = 0; gbc.gridy = row;
-        gbc.gridwidth = 2;
-        JPanel btnPanel = new JPanel(new FlowLayout());
-        JButton btnSalva = new JButton("Salva");
-        JButton btnAnnulla = new JButton("Annulla");
-        btnPanel.add(btnSalva);
-        btnPanel.add(btnAnnulla);
-        panel.add(btnPanel, gbc);
+        formPanel.add(scrollNote, gbc);
 
         cmbTipo.setSelectedItem(consegna.getTipoConsegna());
 
+        // Bottoni
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 15));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(220, 220, 220)));
+        
+        JButton btnSalva = createStyledButton("Salva", new Color(40, 167, 69));
+        JButton btnAnnulla = createStyledButton("Annulla", new Color(108, 117, 125));
+        
+        buttonPanel.add(btnSalva);
+        buttonPanel.add(btnAnnulla);
+
         btnSalva.addActionListener(e -> {
             try {
-                consegna.setDestinatario(txtDestinatario.getText().trim());
-                consegna.setNoteConsegna(txtNote.getText().trim());
-                consegna.setTipoConsegna((TipoConsegna) cmbTipo.getSelectedItem());
-                consegna.setData(LocalDate.parse(txtData.getText().trim()));
-                
-                if (!txtOraInizio.getText().trim().isEmpty()) {
-                    consegna.setOraInizioPref(LocalTime.parse(txtOraInizio.getText().trim()));
+                String destinatario = txtDestinatario.getText().trim();
+                if (destinatario.isEmpty()) {
+                    showMsg("Il destinatario è obbligatorio", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
                 }
-                if (!txtOraFine.getText().trim().isEmpty()) {
-                    consegna.setOraFinePref(LocalTime.parse(txtOraFine.getText().trim()));
+                
+                LocalDate dataConsegna;
+                try {
+                    dataConsegna = LocalDate.parse(txtData.getText().trim(), dateFormatter);
+                } catch (DateTimeParseException ex) {
+                    showMsg("Formato data non valido. Usa yyyy-MM-dd", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                if (dataConsegna.isBefore(LocalDate.now())) {
+                    showMsg("La data non può essere nel passato", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                LocalTime oraInizio = null, oraFine = null;
+                String oraInizioStr = txtOraInizio.getText().trim();
+                String oraFineStr = txtOraFine.getText().trim();
+                
+                if (!oraInizioStr.isEmpty() && !oraFineStr.isEmpty()) {
+                    try {
+                        oraInizio = LocalTime.parse(oraInizioStr, timeFormatter);
+                        oraFine = LocalTime.parse(oraFineStr, timeFormatter);
+                        if (!oraInizio.isBefore(oraFine)) {
+                            showMsg("Ora inizio deve essere prima di ora fine", "Errore", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    } catch (DateTimeParseException ex) {
+                        showMsg("Formato ora non valido. Usa HH:mm", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                } else if (!oraInizioStr.isEmpty() || !oraFineStr.isEmpty()) {
+                    showMsg("Inserisci sia ora inizio che fine", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
                 }
 
                 TipoConsegna tipo = (TipoConsegna) cmbTipo.getSelectedItem();
-                consegna.setSedeUniversitaria(tipo == TipoConsegna.A_MANO ? txtSedeUni.getText().trim() : null);
-                consegna.setIndirizzo(tipo == TipoConsegna.SPEDIZIONE ? txtIndirizzo.getText().trim() : null);
-                consegna.setCivico(tipo == TipoConsegna.SPEDIZIONE ? txtCivico.getText().trim() : null);
-                consegna.setCorriere(tipo == TipoConsegna.SPEDIZIONE ? txtCorriere.getText().trim() : null);
-                consegna.setTrackingNumber(tipo == TipoConsegna.SPEDIZIONE ? txtTracking.getText().trim() : null);
+                
+                if (tipo == TipoConsegna.A_MANO) {
+                    String sedeUni = txtSedeUni.getText().trim();
+                    if (sedeUni.isEmpty()) {
+                        showMsg("Sede universitaria obbligatoria", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    consegna.setSedeUniversitaria(sedeUni);
+                    consegna.setIndirizzo(null);
+                    consegna.setCivico(null);
+                    consegna.setCorriere(null);
+                    consegna.setTrackingNumber(null);
+                } else if (tipo == TipoConsegna.SPEDIZIONE) {
+                    String indirizzo = txtIndirizzo.getText().trim();
+                    String civico = txtCivico.getText().trim();
+                    if (indirizzo.isEmpty() || civico.isEmpty()) {
+                        showMsg("Indirizzo e civico obbligatori", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    consegna.setIndirizzo(indirizzo);
+                    consegna.setCivico(civico);
+                    consegna.setCorriere(txtCorriere.getText().trim().isEmpty() ? null : txtCorriere.getText().trim());
+                    consegna.setTrackingNumber(txtTracking.getText().trim().isEmpty() ? null : txtTracking.getText().trim());
+                    consegna.setSedeUniversitaria(null);
+                }
 
-                boolean result = controller.modificaConsegna(consegna);
+                consegna.setDestinatario(destinatario);
+                consegna.setNoteConsegna(txtNote.getText().trim());
+                consegna.setTipoConsegna(tipo);
+                consegna.setData(dataConsegna);
+                consegna.setOraInizioPref(oraInizio);
+                consegna.setOraFinePref(oraFine);
 
-                if (result) {
-                    JOptionPane.showMessageDialog(dialog, "Consegna modificata con successo!", 
-                        "Successo", JOptionPane.INFORMATION_MESSAGE);
+                if (controller.modificaConsegna(consegna)) {
+                    showMsg("Consegna modificata con successo", "Successo", JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     caricaConsegne();
                 } else {
-                    JOptionPane.showMessageDialog(dialog, "Errore nella modifica della consegna.", 
-                        "Errore", JOptionPane.ERROR_MESSAGE);
+                    showMsg("Errore nella modifica", "Errore", JOptionPane.ERROR_MESSAGE);
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Errore: " + ex.getMessage(), 
-                    "Errore", JOptionPane.ERROR_MESSAGE);
+                showMsg("Errore: " + ex.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
             }
         });
 
         btnAnnulla.addActionListener(e -> dialog.dispose());
 
-        dialog.add(new JScrollPane(panel));
+        mainPanel.add(new JScrollPane(formPanel), BorderLayout.CENTER);
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        dialog.add(mainPanel);
         dialog.setVisible(true);
+    }
+
+    private JTextField createTextField(String text) {
+        JTextField field = new JTextField(text, 20);
+        field.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        field.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        return field;
+    }
+
+    private JLabel createLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("SansSerif", Font.BOLD, 13));
+        label.setForeground(new Color(60, 60, 60));
+        return label;
     }
 
     private void visualizzaDettagli(boolean isRicevute) {
@@ -393,76 +521,74 @@ public class ConsegnaFrame extends JFrame {
         int selectedRow = table.getSelectedRow();
         
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this,
-                "Seleziona una consegna dalla tabella.",
-                "Attenzione",
-                JOptionPane.WARNING_MESSAGE);
+            showMsg("Seleziona una consegna dalla tabella", "Nessuna selezione", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         int idConsegna = (int) model.getValueAt(selectedRow, 0);
-        
         List<Consegna> tutte = controller.listaTutteConsegne();
-        Consegna consegna = tutte.stream()
-            .filter(c -> c.getIdConsegna() == idConsegna)
-            .findFirst()
-            .orElse(null);
+        Consegna consegna = tutte.stream().filter(c -> c.getIdConsegna() == idConsegna).findFirst().orElse(null);
 
         if (consegna == null) {
-            JOptionPane.showMessageDialog(this, "Consegna non trovata.", 
-                "Errore", JOptionPane.ERROR_MESSAGE);
+            showMsg("Consegna non trovata", "Errore", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         StringBuilder dettagli = new StringBuilder();
-        dettagli.append("═══════════════════════════════\n");
-        dettagli.append("      DETTAGLI CONSEGNA\n");
-        dettagli.append("═══════════════════════════════\n\n");
-        
         dettagli.append("ID Consegna: ").append(consegna.getIdConsegna()).append("\n");
         dettagli.append("Destinatario: ").append(consegna.getDestinatario()).append("\n");
-        dettagli.append("Tipo: ").append(consegna.getTipoConsegna().toString()).append("\n\n");
-        
+        dettagli.append("Tipo: ").append(consegna.getTipoConsegna()).append("\n");
         dettagli.append("Data: ").append(consegna.getData()).append("\n");
         
         if (consegna.getOraInizioPref() != null) {
-            dettagli.append("Ora Inizio Preferita: ").append(consegna.getOraInizioPref()).append("\n");
+            dettagli.append("Ora Inizio: ").append(consegna.getOraInizioPref()).append("\n");
         }
         if (consegna.getOraFinePref() != null) {
-            dettagli.append("Ora Fine Preferita: ").append(consegna.getOraFinePref()).append("\n");
+            dettagli.append("Ora Fine: ").append(consegna.getOraFinePref()).append("\n");
         }
-        
-        dettagli.append("\n--- Dettagli Luogo ---\n");
-        
-        if (consegna.getTipoConsegna() == TipoConsegna.A_MANO) {
-            dettagli.append("Sede Universitaria: ").append(consegna.getSedeUniversitaria()).append("\n");
-        } else if (consegna.getTipoConsegna() == TipoConsegna.SPEDIZIONE) {
-            dettagli.append("Indirizzo: ").append(consegna.getIndirizzo()).append(" ")
-                    .append(consegna.getCivico()).append("\n");
-            if (consegna.getCorriere() != null && !consegna.getCorriere().isEmpty()) {
+        if (consegna.getTipoConsegna() == TipoConsegna.A_MANO && consegna.getSedeUniversitaria() != null) {
+            dettagli.append("Sede: ").append(consegna.getSedeUniversitaria()).append("\n");
+        }
+        if (consegna.getTipoConsegna() == TipoConsegna.SPEDIZIONE) {
+            if (consegna.getIndirizzo() != null) {
+                dettagli.append("Indirizzo: ").append(consegna.getIndirizzo()).append(" ").append(consegna.getCivico()).append("\n");
+            }
+            if (consegna.getCorriere() != null) {
                 dettagli.append("Corriere: ").append(consegna.getCorriere()).append("\n");
             }
-            if (consegna.getTrackingNumber() != null && !consegna.getTrackingNumber().isEmpty()) {
-                dettagli.append("Tracking Number: ").append(consegna.getTrackingNumber()).append("\n");
-            }
         }
-        
-        dettagli.append("\nID Annuncio: ").append(consegna.getIdAnnuncio()).append("\n");
-        
         if (consegna.getNoteConsegna() != null && !consegna.getNoteConsegna().isEmpty()) {
-            dettagli.append("\n--- Note ---\n");
-            dettagli.append(consegna.getNoteConsegna()).append("\n");
+            dettagli.append("\nNote:\n").append(consegna.getNoteConsegna());
         }
-        
-        dettagli.append("\n═══════════════════════════════");
 
         JTextArea textArea = new JTextArea(dettagli.toString());
         textArea.setEditable(false);
         textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(400, 400));
+        scrollPane.setPreferredSize(new Dimension(400, 300));
 
-        JOptionPane.showMessageDialog(this, scrollPane, 
-            "Dettagli Consegna", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, scrollPane, "Dettagli Consegna", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void showMsg(String msg, String title, int type) {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JLabel icon = new JLabel(type == JOptionPane.ERROR_MESSAGE ? "X" : type == JOptionPane.WARNING_MESSAGE ? "!" : "✓");
+        icon.setFont(new Font("SansSerif", Font.BOLD, 40));
+        icon.setForeground(type == JOptionPane.ERROR_MESSAGE ? new Color(220, 53, 69) : type == JOptionPane.WARNING_MESSAGE ? new Color(255, 193, 7) : new Color(40, 167, 69));
+        icon.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(icon);
+        p.add(Box.createVerticalStrut(10));
+        JLabel t = new JLabel(title);
+        t.setFont(new Font("SansSerif", Font.BOLD, 16));
+        t.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(t);
+        p.add(Box.createVerticalStrut(5));
+        JLabel m = new JLabel(msg);
+        m.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        m.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(m);
+        JOptionPane.showMessageDialog(this, p, title, JOptionPane.PLAIN_MESSAGE);
     }
 }

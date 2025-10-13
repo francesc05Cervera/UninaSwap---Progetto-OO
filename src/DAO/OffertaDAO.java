@@ -206,5 +206,37 @@ public class OffertaDAO
 	    }
 	}
 
-	
+    public boolean updateOfferta(Offerta offerta) throws SQLException {
+        String sql = "UPDATE Offerta SET PrezzoProposto = ?, Oggetti = ?, Messaggio = ? WHERE ID_Offerta = ?";
+
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            // PrezzoProposto
+            if (offerta.getPrezzoProposto() <= 0) {
+                ps.setNull(1, Types.NUMERIC);
+            } else {
+                ps.setDouble(1, offerta.getPrezzoProposto());
+            }
+
+            // Oggetti
+            if (offerta.getOggetti() == null || offerta.getOggetti().isEmpty()) {
+                ps.setNull(2, Types.VARCHAR);
+            } else {
+                ps.setString(2, offerta.getOggetti());
+            }
+
+            // Messaggio
+            if (offerta.getMessaggio() == null || offerta.getMessaggio().isEmpty()) {
+                ps.setNull(3, Types.VARCHAR);
+            } else {
+                ps.setString(3, offerta.getMessaggio());
+            }
+
+            ps.setInt(4, offerta.getIdOfferta());
+
+            int righeModificate = ps.executeUpdate();
+            return righeModificate > 0; // TRUE se l'update è andato a buon fine
+        }
+    }
+
 }

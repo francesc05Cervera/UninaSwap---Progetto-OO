@@ -1,72 +1,122 @@
 package GUI;
-
 import javax.swing.*;
+import javax.swing.border.*;
 import java.awt.*;
 import Controller.UtenteController;
 import entità.Utente;
 
-public class AccountFrame extends JFrame {
-
-    public AccountFrame(String usernameUtente) {
-        // Titolo della finestra
+public class AccountFrame extends JFrame 
+{
+    public AccountFrame(String usernameUtente) 
+    {
         setTitle("Il mio Account - Unina Swap");
-
-        // Dimensioni
-        setSize(400, 250);
+        setSize(550, 500);
+        setMinimumSize(new Dimension(550, 500));
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // Chiude solo questa finestra
-
-        // Layout principale
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.anchor = GridBagConstraints.WEST;
-
-        // Titolo
-        JLabel lblTitle = new JLabel("Informazioni Account");
-        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 2;
-        panel.add(lblTitle, gbc);
-
-        // Reset gridwidth
-        gbc.gridwidth = 1;
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        
+        // Panel principale
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(new Color(240, 242, 245));
+        
+        // Header
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(23, 162, 184));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        
+        JPanel headerContent = new JPanel();
+        headerContent.setLayout(new BoxLayout(headerContent, BoxLayout.Y_AXIS));
+        headerContent.setOpaque(false);
+        
+        JLabel lblIcon = new JLabel("👤");
+        lblIcon.setFont(new Font("SansSerif", Font.PLAIN, 36));
+        lblIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerContent.add(lblIcon);
+        
+        headerContent.add(Box.createVerticalStrut(8));
+        
+        JLabel lblTitle = new JLabel("Il mio Account");
+        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 20));
+        lblTitle.setForeground(Color.WHITE);
+        lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        headerContent.add(lblTitle);
+        
+        headerPanel.add(headerContent, BorderLayout.CENTER);
+        
+        // Content Panel con scroll
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 25, 20, 25));
+        
         UtenteController ctrlU = new UtenteController();
         Utente ut = ctrlU.cercaUtente(usernameUtente);
-        // Etichetta Username
-        gbc.gridy++;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Username:"), gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel(usernameUtente), gbc);
-
-        // Etichetta Nome (placeholder)
-        gbc.gridy++;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Nome:"), gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel(ut.getNome()), gbc); // Da sostituire con dato reale
-
-        // Etichetta Cognome (placeholder)
-        gbc.gridy++;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Cognome:"), gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel(ut.getCognome()), gbc); // Da sostituire con dato reale
-
-        // Etichetta Email (placeholder)
-        gbc.gridy++;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Email:"), gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel(ut.getEmail()), gbc); // Da sostituire con dato reale
-
-        // Aggiunge il pannello alla finestra
-        add(panel);
-
-        // Rende visibile la finestra
+        
+        // Aggiungi info utente
+        contentPanel.add(createInfoRow("Username", usernameUtente, new Color(0, 102, 204)));
+        contentPanel.add(Box.createVerticalStrut(15));
+        
+        contentPanel.add(createInfoRow("Nome", ut.getNome(), new Color(40, 167, 69)));
+        contentPanel.add(Box.createVerticalStrut(15));
+        
+        contentPanel.add(createInfoRow("Cognome", ut.getCognome(), new Color(111, 66, 193)));
+        contentPanel.add(Box.createVerticalStrut(15));
+        
+        contentPanel.add(createInfoRow("Email", ut.getEmail(), new Color(220, 53, 69)));
+        contentPanel.add(Box.createVerticalGlue());
+        
+        // ScrollPane per il contenuto
+        JScrollPane scrollPane = new JScrollPane(contentPanel);
+        scrollPane.setBorder(new LineBorder(new Color(220, 220, 220), 1));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setBackground(Color.WHITE);
+        
+        // Wrapper per il content
+        JPanel contentWrapper = new JPanel(new BorderLayout());
+        contentWrapper.setBackground(new Color(240, 242, 245));
+        contentWrapper.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        contentWrapper.add(scrollPane, BorderLayout.CENTER);
+        
+        // Assembla tutto
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(contentWrapper, BorderLayout.CENTER);
+        
+        add(mainPanel);
         setVisible(true);
+    }
+    
+    private JPanel createInfoRow(String label, String value, Color accentColor) {
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.setBackground(Color.WHITE);
+        row.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(230, 230, 230), 1, true),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+        
+        // Barra colorata laterale
+        JPanel colorBar = new JPanel();
+        colorBar.setBackground(accentColor);
+        colorBar.setPreferredSize(new Dimension(4, 40));
+        
+        // Contenuto testo
+        JPanel textPanel = new JPanel(new GridLayout(2, 1, 0, 4));
+        textPanel.setOpaque(false);
+        
+        JLabel lblLabel = new JLabel(label);
+        lblLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        lblLabel.setForeground(new Color(108, 117, 125));
+        
+        JLabel lblValue = new JLabel(value);
+        lblValue.setFont(new Font("SansSerif", Font.BOLD, 15));
+        lblValue.setForeground(new Color(33, 37, 41));
+        
+        textPanel.add(lblLabel);
+        textPanel.add(lblValue);
+        
+        row.add(colorBar, BorderLayout.WEST);
+        row.add(textPanel, BorderLayout.CENTER);
+        
+        return row;
     }
 }

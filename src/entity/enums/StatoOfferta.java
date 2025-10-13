@@ -3,7 +3,8 @@ package entity.enums;
 public enum StatoOfferta {
     ACCETTATA("ACCETTATA"),
     IN_SOSPESO("IN SOSPESO"),   
-    RIFIUTATA("RIFIUTATA");
+    RIFIUTATA("RIFIUTATA"),
+	RITIRATA("RITIRATA");
 
     private final String dbValue;
 

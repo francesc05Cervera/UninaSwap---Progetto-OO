@@ -8,485 +8,571 @@ import entità.Annuncio;
 import entità.Categoria;
 import entità.Offerta;
 import entity.enums.TipoAnnuncio;
+import entity.enums.StatoOfferta;
 
 import javax.swing.*;
+import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AnnuncioFrame extends JFrame {
-
-    private String username;
-    private AnnuncioController annuncioCtrl;
-    private CategoriaController categoriaCtrl;
-    private OffertaController offertaCtrl;
-
+public class AnnuncioFrame extends JFrame 
+{
+    private String nomeUtente;
+    private AnnuncioController controllerAnnuncio;
+    private CategoriaController controllerCategoria;
+    private OffertaController controllerOfferta;
     private JTable tabella;
     private DefaultTableModel modelloTabella;
+    private JComboBox<Annuncio> comboModifica, comboElimina;
+    private JComboBox<String> comboFiltroCategorie;
+    private List<Categoria> listaCategorie;
 
-    private JComboBox<Annuncio> comboModifica;
-    private JComboBox<Annuncio> comboElimina;
+    public AnnuncioFrame(String nomeUtente) {
+        this.nomeUtente = nomeUtente;
+        this.controllerAnnuncio = new AnnuncioController();
+        this.controllerCategoria = new CategoriaController();
+        this.controllerOfferta = new OffertaController();
 
-    public AnnuncioFrame(String username) {
-        this.username = username;
-        this.annuncioCtrl = new AnnuncioController();
-        this.categoriaCtrl = new CategoriaController();
-        this.offertaCtrl = new OffertaController();
-
-        setTitle("Gestione Annunci - Utente: " + username);
-        setSize(800, 600);
+        setTitle("Gestione Annunci - Unina Swap");
+        setSize(1000, 700);
+        setMinimumSize(new Dimension(950, 650));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLayout(new BorderLayout());
 
-        // Panel superiore con bottone Home
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnHome = new JButton("🏠 Torna alla Home");
-        btnHome.setPreferredSize(new Dimension(150, 30));
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 0));
+        mainPanel.setBackground(new Color(240, 242, 245));
+
+        // Header
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(220, 220, 220)),
+            BorderFactory.createEmptyBorder(15, 25, 15, 25)
+        ));
+
+        JLabel lblTitle = new JLabel("Gestione Annunci");
+        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 24));
+        lblTitle.setForeground(new Color(0, 102, 204));
+
+        JButton btnHome = createStyledButton("Indietro", new Color(108, 117, 125));
         btnHome.addActionListener(e -> {
-            this.dispose(); // Chiude la finestra corrente
-            // Apri la finestra del menu principale
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    // Assumendo che tu abbia una classe MenuFrame
-                    new MenuFrame(username).setVisible(true);
-                } catch (Exception ex) {
-                    // Se MenuFrame non esiste, almeno chiude la finestra
-                    System.out.println("MenuFrame non trovato: " + ex.getMessage());
-                }
-            });
+            dispose();
+            new MenuFrame(nomeUtente);
         });
-        topPanel.add(btnHome);
-        add(topPanel, BorderLayout.NORTH);
 
+        headerPanel.add(lblTitle, BorderLayout.WEST);
+        headerPanel.add(btnHome, BorderLayout.EAST);
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+
+        // Tabs
         JTabbedPane tabs = new JTabbedPane();
+        tabs.setFont(new Font("SansSerif", Font.BOLD, 13));
+        tabs.setBackground(Color.WHITE);
+        tabs.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // --- TAB 1: Visualizza ---
-        JPanel tabVisualizza = new JPanel(new BorderLayout());
-        modelloTabella = new DefaultTableModel(
-                new Object[]{"ID", "Titolo", "Descrizione", "Tipo", "Prezzo Min", "Prezzo Vendita", "Oggetti", "Disponibile", "Categoria"}, 0)
-        {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false; // tabella non editabile
-            }
-        };
-        tabella = new JTable(modelloTabella);
-        refreshTabella();
-        tabVisualizza.add(new JScrollPane(tabella), BorderLayout.CENTER);
-        tabs.add("Visualizza Annunci", tabVisualizza);
+        tabs.addTab("Visualizza", creaTabVisualizza());
+        tabs.addTab("Nuovo", creaTabNuovo());
+        tabs.addTab("Modifica", creaTabModifica());
+        tabs.addTab("Elimina", creaTabElimina());
 
-        // --- TAB 2: Crea ---
-        JPanel tabCrea = creaFormAnnuncio();
-        tabs.add("Crea Annuncio", tabCrea);
-
-        // --- TAB 3: Modifica ---
-        JPanel tabModifica = creaFormModifica();
-        tabs.add("Modifica Annuncio", tabModifica);
-
-        // --- TAB 4: Elimina ---
-        JPanel tabElimina = creaFormElimina();
-        tabs.add("Elimina Annuncio", tabElimina);
-
-        // Carica gli annunci dopo aver creato tutti i combo
+        mainPanel.add(tabs, BorderLayout.CENTER);
+        add(mainPanel);
         caricaAnnunci();
-
-        add(tabs, BorderLayout.CENTER);
         setVisible(true);
     }
 
-    // ================== METODI ==================
+    private JPanel creaTabVisualizza() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-    private JPanel creaFormAnnuncio() {
-        JPanel panel = new JPanel(new GridLayout(10, 2, 5, 5));
+        // Filtro categorie
+        JPanel filtroPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filtroPanel.setBackground(Color.WHITE);
 
-        JTextField txtTitolo = new JTextField();
-        JTextArea txtDescrizione = new JTextArea(3, 20);
-        JComboBox<TipoAnnuncio> comboTipo = new JComboBox<>(TipoAnnuncio.values());
-        JTextField txtPrezzoMin = new JTextField();
-        JTextField txtPrezzoVendita = new JTextField();
-        JTextField txtOggetti = new JTextField();
+        comboFiltroCategorie = new JComboBox<>();
+        comboFiltroCategorie.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        comboFiltroCategorie.addItem("Tutti Gli Annunci"); // Prima opzione
 
-        JComboBox<Categoria> comboCategoria = new JComboBox<>();
         try {
-            for (Categoria c : categoriaCtrl.listCategorie()) {
-                comboCategoria.addItem(c);
+            listaCategorie = controllerCategoria.listCategorie();
+            for (Categoria c : listaCategorie) {
+                comboFiltroCategorie.addItem(c.getNomeCategoria());
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            listaCategorie = new ArrayList<>();
         }
 
-        JButton btnCrea = new JButton("Crea Annuncio");
+        comboFiltroCategorie.addActionListener(e -> filtraAnnunciPerCategoria());
 
-        panel.add(new JLabel("Titolo:"));
-        panel.add(txtTitolo);
-        panel.add(new JLabel("Descrizione:"));
-        panel.add(new JScrollPane(txtDescrizione));
-        panel.add(new JLabel("Tipo:"));
-        panel.add(comboTipo);
-        panel.add(new JLabel("Prezzo Offerta Minima:"));
-        panel.add(txtPrezzoMin);
-        panel.add(new JLabel("Prezzo Vendita:"));
-        panel.add(txtPrezzoVendita);
-        panel.add(new JLabel("Oggetti da Scambiare:"));
-        panel.add(txtOggetti);
-        panel.add(new JLabel("Categoria:"));
-        panel.add(comboCategoria);
-        panel.add(new JLabel(""));
-        panel.add(btnCrea);
+        filtroPanel.add(new JLabel("Categoria:"));
+        filtroPanel.add(comboFiltroCategorie);
 
-        // gestione creazione
-        btnCrea.addActionListener(e -> {
-            try {
-                String titolo = txtTitolo.getText().trim();
-                String descrizione = txtDescrizione.getText().trim();
-                
-                // Validazioni
-                if (titolo.length() < 3) {
-                    JOptionPane.showMessageDialog(this, "Il titolo deve avere almeno 3 caratteri.");
-                    return;
-                }
-                
-                if (descrizione.length() < 10) {
-                    JOptionPane.showMessageDialog(this, "La descrizione deve avere almeno 10 caratteri.");
-                    return;
-                }
-                
-                TipoAnnuncio tipo = (TipoAnnuncio) comboTipo.getSelectedItem();
-                Categoria cat = (Categoria) comboCategoria.getSelectedItem();
+        panel.add(filtroPanel, BorderLayout.NORTH);
 
-                double prezzoMin = 0;
-                double prezzoVendita = 0;
-                String oggetti = "";
+        modelloTabella = new DefaultTableModel(
+            new String[]{"Titolo", "Descrizione", "Tipo", "Prezzo Min", "Prezzo Vend", "Oggetti", "Stato", "Categoria"}, 0) {
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
 
-                if (tipo == TipoAnnuncio.VENDITA) {
-                    prezzoMin = Double.parseDouble(txtPrezzoMin.getText().trim());
-                    prezzoVendita = Double.parseDouble(txtPrezzoVendita.getText().trim());
-                } else if (tipo == TipoAnnuncio.SCAMBIO) {
-                    oggetti = txtOggetti.getText().trim();
-                }
+        tabella = new JTable(modelloTabella);
+        tabella.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        tabella.setRowHeight(30);
+        tabella.setSelectionBackground(new Color(0, 102, 204, 50));
+        tabella.setGridColor(new Color(230, 230, 230));
+        tabella.getColumnModel().getColumn(0).setPreferredWidth(200);
+        tabella.getColumnModel().getColumn(1).setPreferredWidth(300);
+        tabella.getColumnModel().getColumn(2).setPreferredWidth(80);
+        tabella.getColumnModel().getColumn(3).setPreferredWidth(70);
+        tabella.getColumnModel().getColumn(4).setPreferredWidth(70);
+        tabella.getColumnModel().getColumn(5).setPreferredWidth(150);
+        tabella.getColumnModel().getColumn(6).setPreferredWidth(100);
+        tabella.getColumnModel().getColumn(7).setPreferredWidth(100);
 
-                boolean ok = annuncioCtrl.creaNuovoAnnuncio(
-                        titolo, descrizione, tipo, oggetti, prezzoMin, prezzoVendita, username, cat.getNomeCategoria()
-                );
+        JTableHeader header = tabella.getTableHeader();
+        header.setFont(new Font("SansSerif", Font.BOLD, 13));
+        header.setBackground(new Color(0, 102, 204));
+        header.setForeground(Color.WHITE);
+        header.setPreferredSize(new Dimension(header.getWidth(), 35));
 
-                if (ok) {
-                    JOptionPane.showMessageDialog(this, "Annuncio creato con successo!");
-                    refreshTabella();
-                    caricaAnnunci();
-                    // Reset dei campi dopo la creazione
-                    txtTitolo.setText("");
-                    txtDescrizione.setText("");
-                    txtPrezzoMin.setText("");
-                    txtPrezzoVendita.setText("");
-                    txtOggetti.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Errore nella creazione.");
-                }
+        refreshTabella(); // Carica tutti all’avvio
 
-            } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this, "Errore nei valori numerici inseriti.");
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Errore: " + ex.getMessage());
-            }
-        });
-
+        JScrollPane scrollPane = new JScrollPane(tabella);
+        scrollPane.setBorder(new LineBorder(new Color(220, 220, 220), 1));
+        panel.add(scrollPane, BorderLayout.CENTER);
         return panel;
     }
 
-    private JPanel creaFormModifica() {
-        JPanel panel = new JPanel(new GridLayout(9, 2, 5, 5));
+
+    private JPanel creaTabNuovo() {
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setBackground(Color.WHITE);
+        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(8, 10, 8, 10);
+
+        JTextField campoTitolo = createTextField("");
+        JTextArea campoDescrizione = new JTextArea(4, 20);
+        campoDescrizione.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        campoDescrizione.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        JScrollPane scrollDesc = new JScrollPane(campoDescrizione);
+
+        JComboBox<TipoAnnuncio> comboTipo = new JComboBox<>(TipoAnnuncio.values());
+        comboTipo.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        JTextField campoPrezzoMin = createTextField("");
+        JTextField campoPrezzoVendita = createTextField("");
+        JTextField campoOggetti = createTextField("");
+        JComboBox<Categoria> comboCategoria = new JComboBox<>();
+        comboCategoria.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        
+        try {
+            for (Categoria c : controllerCategoria.listCategorie()) comboCategoria.addItem(c);
+        } catch (Exception e) {}
+
+        comboTipo.addActionListener(e -> aggiornaAbilitazioneCampi(comboTipo, campoPrezzoMin, campoPrezzoVendita, campoOggetti));
+        campoPrezzoMin.setEnabled(true);
+        campoPrezzoVendita.setEnabled(true);
+        campoOggetti.setEnabled(false);
+
+        int row = 0;
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Titolo*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoTitolo, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Descrizione*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(scrollDesc, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Tipo*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(comboTipo, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Prezzo Min:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoPrezzoMin, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Prezzo Vendita:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoPrezzoVendita, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Oggetti:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoOggetti, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Categoria*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(comboCategoria, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3;
+        JButton btnCrea = createStyledButton("Crea Annuncio", new Color(40, 167, 69));
+        btnCrea.setPreferredSize(new Dimension(200, 40));
+        formPanel.add(btnCrea, gbc);
+
+        btnCrea.addActionListener(e -> creaAnnuncio(campoTitolo, campoDescrizione, comboTipo, campoPrezzoMin, campoPrezzoVendita, campoOggetti, comboCategoria));
+
+        mainPanel.add(new JScrollPane(formPanel), BorderLayout.CENTER);
+        return mainPanel;
+    }
+
+    private JPanel creaTabModifica() {
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setBackground(Color.WHITE);
+        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(8, 10, 8, 10);
 
         comboModifica = new JComboBox<>();
-        
-        JTextField txtTitolo = new JTextField();
-        JTextArea txtDescrizione = new JTextArea(3, 20);
+        comboModifica.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        comboModifica.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Annuncio) {
+                    Annuncio a = (Annuncio) value;
+                    setText(a.getTitolo() + " (ID: " + a.getIdAnnuncio() + ")");
+                }
+                return this;
+            }
+        });
+        JTextField campoTitolo = createTextField("");
+        JTextArea campoDescrizione = new JTextArea(4, 20);
+        campoDescrizione.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        campoDescrizione.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        JScrollPane scrollDesc = new JScrollPane(campoDescrizione);
         JComboBox<TipoAnnuncio> comboTipo = new JComboBox<>(TipoAnnuncio.values());
-        JTextField txtPrezzoMin = new JTextField();
-        JTextField txtPrezzoVendita = new JTextField();
-        JTextField txtOggetti = new JTextField();
-        JCheckBox chkDisponibile = new JCheckBox("Disponibile");
+        comboTipo.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        JTextField campoPrezzoMin = createTextField("");
+        JTextField campoPrezzoVendita = createTextField("");
+        JTextField campoOggetti = createTextField("");
+        JCheckBox checkDisponibile = new JCheckBox("Disponibile");
+        checkDisponibile.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        JButton btnModifica = new JButton("Salva Modifiche");
+        comboModifica.addActionListener(e -> caricaDatiModifica(comboModifica, campoTitolo, campoDescrizione, comboTipo, campoPrezzoMin, campoPrezzoVendita, campoOggetti, checkDisponibile));
+        comboTipo.addActionListener(e -> aggiornaAbilitazioneCampi(comboTipo, campoPrezzoMin, campoPrezzoVendita, campoOggetti));
 
-        panel.add(new JLabel("Seleziona Annuncio:"));
-        panel.add(comboModifica);
-        panel.add(new JLabel("Titolo:"));
-        panel.add(txtTitolo);
-        panel.add(new JLabel("Descrizione:"));
-        panel.add(new JScrollPane(txtDescrizione));
-        panel.add(new JLabel("Tipo:"));
-        panel.add(comboTipo);
-        panel.add(new JLabel("Prezzo Offerta Minima:"));
-        panel.add(txtPrezzoMin);
-        panel.add(new JLabel("Prezzo Vendita:"));
-        panel.add(txtPrezzoVendita);
-        panel.add(new JLabel("Oggetti da Scambiare:"));
-        panel.add(txtOggetti);
-        panel.add(new JLabel(""));
-        panel.add(chkDisponibile);
-        panel.add(new JLabel(""));
-        panel.add(btnModifica);
+        int row = 0;
+        gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Annuncio:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(comboModifica, gbc);
 
-        // Listener per caricare i dati quando si seleziona un annuncio
-        comboModifica.addActionListener(e -> {
-            Annuncio annuncio = (Annuncio) comboModifica.getSelectedItem();
-            if (annuncio != null) {
-                // Valorizza tutti i campi con i dati originali
-                txtTitolo.setText(annuncio.getTitolo());
-                txtDescrizione.setText(annuncio.getDescrizione());
-                comboTipo.setSelectedItem(annuncio.getTipoAnnuncio());
-                txtPrezzoMin.setText(String.valueOf(annuncio.getPrezzoOffertaMinima()));
-                txtPrezzoVendita.setText(String.valueOf(annuncio.getPrezzoVendita()));
-                txtOggetti.setText(annuncio.getOggettiDaScambiare());
-                chkDisponibile.setSelected(annuncio.isDisponibile());
-                
-                // Abilita/disabilita campi in base al tipo
-                boolean isVendita = annuncio.getTipoAnnuncio() == TipoAnnuncio.VENDITA;
-                txtPrezzoMin.setEnabled(isVendita);
-                txtPrezzoVendita.setEnabled(isVendita);
-                txtOggetti.setEnabled(!isVendita);
-            }
-        });
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Titolo*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoTitolo, gbc);
 
-        // Listener per abilitare/disabilitare campi quando cambia il tipo
-        comboTipo.addActionListener(e -> {
-            TipoAnnuncio tipo = (TipoAnnuncio) comboTipo.getSelectedItem();
-            boolean isVendita = tipo == TipoAnnuncio.VENDITA;
-            txtPrezzoMin.setEnabled(isVendita);
-            txtPrezzoVendita.setEnabled(isVendita);
-            txtOggetti.setEnabled(!isVendita);
-        });
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Descrizione*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(scrollDesc, gbc);
 
-        btnModifica.addActionListener(e -> {
-            Annuncio sel = (Annuncio) comboModifica.getSelectedItem();
-            if (sel == null) {
-                JOptionPane.showMessageDialog(this, "Nessun annuncio selezionato.");
-                return;
-            }
-            try {
-                // Validazioni
-                String titolo = txtTitolo.getText().trim();
-                String descrizione = txtDescrizione.getText().trim();
-                
-                if (titolo.length() < 3) {
-                    JOptionPane.showMessageDialog(this, "Il titolo deve avere almeno 3 caratteri.");
-                    return;
-                }
-                
-                if (descrizione.length() < 10) {
-                    JOptionPane.showMessageDialog(this, "La descrizione deve avere almeno 10 caratteri.");
-                    return;
-                }
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Tipo*:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(comboTipo, gbc);
 
-                sel.setTitolo(titolo);
-                sel.setDescrizione(descrizione);
-                sel.setTipoAnnuncio((TipoAnnuncio) comboTipo.getSelectedItem());
-                sel.setDisponibile(chkDisponibile.isSelected());
-                
-                // Aggiorna campi specifici per tipo
-                TipoAnnuncio tipo = (TipoAnnuncio) comboTipo.getSelectedItem();
-                if (tipo == TipoAnnuncio.VENDITA) {
-                    sel.setPrezzoOffertaMinima(Double.parseDouble(txtPrezzoMin.getText().trim()));
-                    sel.setPrezzoVendita(Double.parseDouble(txtPrezzoVendita.getText().trim()));
-                    sel.setOggettiDaScambiare("");
-                } else if (tipo == TipoAnnuncio.SCAMBIO) {
-                    sel.setOggettiDaScambiare(txtOggetti.getText().trim());
-                    sel.setPrezzoOffertaMinima(0);
-                    sel.setPrezzoVendita(0);
-                }
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Prezzo Min:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoPrezzoMin, gbc);
 
-                boolean ok = annuncioCtrl.modificaAnnuncio(sel);
-                if (ok) {
-                    JOptionPane.showMessageDialog(this, "Annuncio modificato!");
-                    refreshTabella();
-                    caricaAnnunci();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Errore modifica.");
-                }
-            } catch (NumberFormatException nfe) {
-                JOptionPane.showMessageDialog(this, "Errore nei valori numerici inseriti.");
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Errore: " + ex.getMessage());
-                ex.printStackTrace();
-            }
-        });
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Prezzo Vend:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoPrezzoVendita, gbc);
 
-        return panel;
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1;
+        formPanel.add(createLabel("Oggetti:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        formPanel.add(campoOggetti, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3;
+        formPanel.add(checkDisponibile, gbc);
+
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3;
+        JButton btnSalva = createStyledButton("Salva", new Color(0, 102, 204));
+        btnSalva.setPreferredSize(new Dimension(200, 40));
+        formPanel.add(btnSalva, gbc);
+
+        btnSalva.addActionListener(e -> salvaModifica(comboModifica, campoTitolo, campoDescrizione, comboTipo, campoPrezzoMin, campoPrezzoVendita, campoOggetti, checkDisponibile));
+
+        mainPanel.add(new JScrollPane(formPanel), BorderLayout.CENTER);
+        return mainPanel;
     }
 
-    private JPanel creaFormElimina() {
-        JPanel panel = new JPanel(new BorderLayout());
-        
-        // Panel principale centrato
-        JPanel mainPanel = new JPanel(new GridBagLayout());
+    private JPanel creaTabElimina() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.WHITE);
         GridBagConstraints gbc = new GridBagConstraints();
-        
-        // Label
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.anchor = GridBagConstraints.WEST;
-        mainPanel.add(new JLabel("Seleziona Annuncio:"), gbc);
-        
-        // ComboBox
-        comboElimina = new JComboBox<>();
-        comboElimina.setPreferredSize(new Dimension(300, 25));
-        gbc.gridx = 1;
-        gbc.gridy = 0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
-        mainPanel.add(comboElimina, gbc);
-        
-        // Bottone Elimina
-        JButton btnElimina = new JButton("Elimina");
-        btnElimina.setPreferredSize(new Dimension(120, 30));
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
-        gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(20, 10, 10, 10);
-        mainPanel.add(btnElimina, gbc);
-        
-        // Aggiungi il panel principale al centro
-        panel.add(mainPanel, BorderLayout.CENTER);
-        
-        btnElimina.addActionListener(e -> eliminaAnnuncio());
+        gbc.insets = new Insets(15, 15, 15, 15);
 
+        comboElimina = new JComboBox<>();
+        comboElimina.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        comboElimina.setPreferredSize(new Dimension(400, 35));
+        comboElimina.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Annuncio) {
+                    Annuncio a = (Annuncio) value;
+                    setText(a.getTitolo() + " (ID: " + a.getIdAnnuncio() + ")");
+                }
+                return this;
+            }
+        });
+
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(createLabel("Annuncio:"), gbc);
+        gbc.gridy = 1;
+        panel.add(comboElimina, gbc);
+        gbc.gridy = 2;
+        JButton btnElimina = createStyledButton("Elimina", new Color(220, 53, 69));
+        btnElimina.setPreferredSize(new Dimension(200, 40));
+        btnElimina.addActionListener(e -> eliminaAnnuncio());
+        panel.add(btnElimina, gbc);
         return panel;
     }
 
-    // ================== FUNZIONI SUPPORTO ==================
+    private JButton createStyledButton(String text, Color color) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 13));
+        btn.setBackground(color);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent e) { btn.setBackground(color.darker()); }
+            public void mouseExited(java.awt.event.MouseEvent e) { btn.setBackground(color); }
+        });
+        return btn;
+    }
 
-    private void refreshTabella() {
-        modelloTabella.setRowCount(0);
-        try {
-            List<Annuncio> annunci = annuncioCtrl.mostraTuttiAnnunci();
-            for (Annuncio a : annunci) {
-                Categoria c = categoriaCtrl.searchByID(a.getIdCategoria());
-                modelloTabella.addRow(new Object[]{
-                        a.getIdAnnuncio(),
-                        a.getTitolo(),
-                        a.getDescrizione(),
-                        a.getTipoAnnuncio(),
-                        a.getPrezzoOffertaMinima(),
-                        a.getPrezzoVendita(),
-                        a.getOggettiDaScambiare(),
-                        a.isDisponibile(),
-                        c != null ? c.getNomeCategoria() : "?"
-                });
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    private JTextField createTextField(String text) {
+        JTextField field = new JTextField(text, 20);
+        field.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        field.setBorder(BorderFactory.createCompoundBorder(
+            new LineBorder(new Color(200, 200, 200), 1, true),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        return field;
+    }
+
+    private JLabel createLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("SansSerif", Font.BOLD, 13));
+        label.setForeground(new Color(60, 60, 60));
+        return label;
+    }
+
+    private void aggiornaAbilitazioneCampi(JComboBox<TipoAnnuncio> tipo, JTextField pMin, JTextField pVend, JTextField ogg) {
+        TipoAnnuncio t = (TipoAnnuncio) tipo.getSelectedItem();
+        if (t == TipoAnnuncio.VENDITA) {
+            pMin.setEnabled(true); pVend.setEnabled(true); ogg.setEnabled(false); ogg.setText("");
+        } else if (t == TipoAnnuncio.SCAMBIO) {
+            pMin.setEnabled(false); pVend.setEnabled(false); ogg.setEnabled(true); pMin.setText(""); pVend.setText("");
+        } else {
+            pMin.setEnabled(false); pVend.setEnabled(false); ogg.setEnabled(false);
+            pMin.setText(""); pVend.setText(""); ogg.setText("");
         }
     }
 
-    // Metodo per caricare annunci nella combo di Modifica ed Elimina
-    private void caricaAnnunci() {
-        if (comboModifica != null) {
-            comboModifica.removeAllItems();
-        }
-        if (comboElimina != null) {
-            comboElimina.removeAllItems();
-        }
-
-        try {
-            // Workaround per il bug nel controller: usiamo tutti gli annunci e filtriamo
-            List<Annuncio> tuttiAnnunci = annuncioCtrl.mostraTuttiAnnunci();
-            List<Annuncio> annunci = new ArrayList<>();
-            
-            if (tuttiAnnunci != null) {
-                for (Annuncio a : tuttiAnnunci) {
-                    if (username.equals(a.getUsername())) {
-                        annunci.add(a);
-                    }
-                }
-            }
-
-            if (annunci.isEmpty()) {
-                // Aggiungiamo un annuncio "fittizio" per indicare che non ce ne sono
-                // L'utente non potrà selezionarlo per le operazioni
-                return;
-            }
-
-            for (Annuncio a : annunci) {
-                if (comboModifica != null) {
-                    comboModifica.addItem(a);
-                }
-                if (comboElimina != null) {
-                    comboElimina.addItem(a);
-                }
-            }
-            
-        } catch (Exception e) {
-            e.printStackTrace();
+    private void caricaDatiModifica(JComboBox<Annuncio> combo, JTextField tit, JTextArea desc, JComboBox<TipoAnnuncio> tipo, JTextField pMin, JTextField pVend, JTextField ogg, JCheckBox disp) {
+        Annuncio a = (Annuncio) combo.getSelectedItem();
+        if (a != null) {
+            tit.setText(a.getTitolo());
+            desc.setText(a.getDescrizione());
+            tipo.setSelectedItem(a.getTipoAnnuncio());
+            pMin.setText(String.valueOf(a.getPrezzoOffertaMinima()));
+            pVend.setText(String.valueOf(a.getPrezzoVendita()));
+            ogg.setText(a.getOggettiDaScambiare());
+            disp.setSelected(a.isDisponibile());
+            aggiornaAbilitazioneCampi(tipo, pMin, pVend, ogg);
         }
     }
 
-    // Metodo per estrarre l'ID dalla stringa del combo
-    private int estraiIdDaStringa(String str) {
+    private void creaAnnuncio(JTextField tit, JTextArea desc, JComboBox<TipoAnnuncio> tipo, JTextField pMin, JTextField pVend, JTextField ogg, JComboBox<Categoria> cat) {
         try {
-            int start = str.lastIndexOf("ID: ") + 4;
-            int end = str.lastIndexOf(")");
-            if (start < 4 || end == -1 || end <= start) {
-                return -1;
+            String t = tit.getText().trim(), d = desc.getText().trim();
+            if (t.length() < 3) { showMsg("Titolo min 3 caratteri", "Errore", 0); return; }
+            if (d.length() < 10) { showMsg("Descrizione min 10 caratteri", "Errore", 0); return; }
+            TipoAnnuncio ta = (TipoAnnuncio) tipo.getSelectedItem();
+            Categoria c = (Categoria) cat.getSelectedItem();
+            double pm = 0, pv = 0;
+            String o = "";
+            if (ta == TipoAnnuncio.VENDITA) {
+                if (pMin.getText().trim().isEmpty() || pVend.getText().trim().isEmpty()) {
+                    showMsg("Inserisci prezzi", "Errore", 0); return;
+                }
+                pm = Double.parseDouble(pMin.getText().trim());
+                pv = Double.parseDouble(pVend.getText().trim());
+                if (pm > pv) { showMsg("Prezzo min > prezzo vend", "Errore", 0); return; }
+            } else if (ta == TipoAnnuncio.SCAMBIO) {
+                o = ogg.getText().trim();
+                if (o.isEmpty()) { showMsg("Inserisci oggetti", "Errore", 0); return; }
             }
-            return Integer.parseInt(str.substring(start, end));
-        } catch (Exception e) {
-            return -1;
-        }
+            if (controllerAnnuncio.creaNuovoAnnuncio(t, d, ta, o, pm, pv, nomeUtente, c.getNomeCategoria())) {
+                showMsg("Creato", "OK", 1);
+                refreshTabella(); caricaAnnunci();
+                tit.setText(""); desc.setText(""); pMin.setText(""); pVend.setText(""); ogg.setText("");
+            } else showMsg("Errore", "Errore", 0);
+        } catch (Exception ex) { showMsg("Errore: " + ex.getMessage(), "Errore", 0); }
     }
 
-    // Metodo per trovare un annuncio per ID
-    private Annuncio trovaAnnuncioPerId(int id) {
+    private void salvaModifica(JComboBox<Annuncio> combo, JTextField tit, JTextArea desc, JComboBox<TipoAnnuncio> tipo, JTextField pMin, JTextField pVend, JTextField ogg, JCheckBox disp) {
+        Annuncio a = (Annuncio) combo.getSelectedItem();
+        if (a == null) { showMsg("Seleziona", "Errore", 2); return; }
         try {
-            // Workaround: usiamo mostraTuttiAnnunci e filtriamo manualmente
-            List<Annuncio> tuttiAnnunci = annuncioCtrl.mostraTuttiAnnunci();
-            if (tuttiAnnunci != null) {
-                for (Annuncio a : tuttiAnnunci) {
-                    if (a.getIdAnnuncio() == id && username.equals(a.getUsername())) {
-                        return a;
-                    }
+            String t = tit.getText().trim(), d = desc.getText().trim();
+            if (t.length() < 3 || d.length() < 10) { showMsg("Titolo/desc troppo corti", "Errore", 0); return; }
+            a.setTitolo(t); a.setDescrizione(d);
+            a.setTipoAnnuncio((TipoAnnuncio) tipo.getSelectedItem());
+            a.setDisponibile(disp.isSelected());
+            TipoAnnuncio tn = (TipoAnnuncio) tipo.getSelectedItem();
+            if (tn == TipoAnnuncio.VENDITA) {
+                if (pMin.getText().trim().isEmpty() || pVend.getText().trim().isEmpty()) {
+                    showMsg("Inserisci prezzi", "Errore", 0); return;
                 }
+                double pm = Double.parseDouble(pMin.getText().trim());
+                double pv = Double.parseDouble(pVend.getText().trim());
+                if (pm > pv) { showMsg("Prezzo min > vend", "Errore", 0); return; }
+                a.setPrezzoOffertaMinima(pm); a.setPrezzoVendita(pv); a.setOggettiDaScambiare("");
+            } else if (tn == TipoAnnuncio.SCAMBIO) {
+                String o = ogg.getText().trim();
+                if (o.isEmpty()) { showMsg("Inserisci oggetti", "Errore", 0); return; }
+                a.setOggettiDaScambiare(o); a.setPrezzoOffertaMinima(0); a.setPrezzoVendita(0);
+            } else {
+                a.setOggettiDaScambiare(""); a.setPrezzoOffertaMinima(0); a.setPrezzoVendita(0);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+            if (controllerAnnuncio.modificaAnnuncio(a)) {
+                showMsg("Modificato", "OK", 1);
+                refreshTabella(); caricaAnnunci();
+            } else showMsg("Errore", "Errore", 0);
+        } catch (Exception ex) { showMsg("Errore: " + ex.getMessage(), "Errore", 0); }
     }
 
     private void eliminaAnnuncio() {
-        Annuncio sel = (Annuncio) comboElimina.getSelectedItem();
-        if (sel == null) {
-            JOptionPane.showMessageDialog(this, "Nessun annuncio selezionato.");
+        Annuncio a = (Annuncio) comboElimina.getSelectedItem();
+        if (a == null) { showMsg("Seleziona", "Errore", 2); return; }
+        try {
+            List<Offerta> off = controllerOfferta.getOffertePerAnnuncio(a.getIdAnnuncio());
+            if (off != null) {
+                for (Offerta o : off) {
+                    if (o.getStatoOfferta() == StatoOfferta.ACCETTATA) {
+                        showMsg("Offerte accettate", "Errore", 0); return;
+                    }
+                }
+            }
+            ConsegnaController cc = new ConsegnaController();
+            if (!cc.listaConsegnePerAnnuncio(a.getIdAnnuncio()).isEmpty()) {
+                showMsg("Consegne attive", "Errore", 0); return;
+            }
+            if (controllerAnnuncio.eliminaAnnuncio(a.getIdAnnuncio())) {
+                showMsg("Eliminato", "OK", 1);
+                refreshTabella(); caricaAnnunci();
+            }
+        } catch (Exception ex) { showMsg("Errore: " + ex.getMessage(), "Errore", 0); }
+    }
+
+    private void refreshTabella() 
+    {
+        if (comboFiltroCategorie != null) 
+        {
+            filtraAnnunciPerCategoria();
             return;
         }
+        modelloTabella.setRowCount(0);
         try {
-            // Controllo offerte
-            List<Offerta> offerte = offertaCtrl.getOffertePerAnnuncio(sel.getIdAnnuncio());
-            if (!offerte.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Impossibile eliminare: ci sono offerte attive.");
-                return;
+            for (Annuncio a : controllerAnnuncio.mostraTuttiAnnunci()) {
+                Categoria c = controllerCategoria.searchByID(a.getIdCategoria());
+                modelloTabella.addRow(new Object[]{
+                    a.getTitolo(), a.getDescrizione(), a.getTipoAnnuncio(),
+                    a.getPrezzoOffertaMinima(), a.getPrezzoVendita(), a.getOggettiDaScambiare(),
+                    a.isDisponibile() ? "DISPONIBILE" : "NON DISPONIBILE",
+                    c != null ? c.getNomeCategoria() : "?"
+                });
             }
-
-            // Controllo consegne
-            ConsegnaController consCtrl = new ConsegnaController();
-            if (!consCtrl.listaConsegnePerAnnuncio(sel.getIdAnnuncio()).isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Impossibile eliminare: ci sono consegne attive.");
-                return;
-            }
-
-            boolean ok = annuncioCtrl.eliminaAnnuncio(sel.getIdAnnuncio());
-            if (ok) {
-                JOptionPane.showMessageDialog(this, "Annuncio eliminato!");
-                refreshTabella();
-                caricaAnnunci();
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
+        } catch (Exception e) {}
     }
+
+
+    private void caricaAnnunci() {
+        if (comboModifica != null) comboModifica.removeAllItems();
+        if (comboElimina != null) comboElimina.removeAllItems();
+        try {
+            List<Annuncio> tutti = controllerAnnuncio.mostraTuttiAnnunci();
+            if (tutti != null) {
+                for (Annuncio a : tutti) {
+                    if (nomeUtente.equals(a.getUsername())) {
+                        if (comboModifica != null) comboModifica.addItem(a);
+                        if (comboElimina != null) comboElimina.addItem(a);
+                    }
+                }
+            }
+        } catch (Exception e) {}
+    }
+
+    private void showMsg(String msg, String title, int type) {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JLabel icon = new JLabel(type == 0 ? "✖" : type == 2 ? "⚠" : "✓");
+        icon.setFont(new Font("SansSerif", Font.BOLD, 40));
+        icon.setForeground(type == 0 ? new Color(220, 53, 69) : type == 2 ? new Color(255, 193, 7) : new Color(40, 167, 69));
+        icon.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(icon);
+        p.add(Box.createVerticalStrut(10));
+        JLabel t = new JLabel(title);
+        t.setFont(new Font("SansSerif", Font.BOLD, 16));
+        t.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(t);
+        p.add(Box.createVerticalStrut(5));
+        JLabel m = new JLabel(msg);
+        m.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        m.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(m);
+        JOptionPane.showMessageDialog(this, p, title, JOptionPane.PLAIN_MESSAGE);
+    }
+    
+    private void filtraAnnunciPerCategoria() {
+        String selezionata = (String) comboFiltroCategorie.getSelectedItem();
+        modelloTabella.setRowCount(0);
+        try {
+            List<Annuncio> tutti = controllerAnnuncio.mostraTuttiAnnunci();
+            for (Annuncio a : tutti) {
+                Categoria c = controllerCategoria.searchByID(a.getIdCategoria());
+                String nomeCat = (c != null) ? c.getNomeCategoria() : "?";
+                if ("Tutti Gli Annunci".equals(selezionata) || nomeCat.equals(selezionata)) {
+                    modelloTabella.addRow(new Object[]{
+                        a.getTitolo(), a.getDescrizione(), a.getTipoAnnuncio(),
+                        a.getPrezzoOffertaMinima(), a.getPrezzoVendita(), a.getOggettiDaScambiare(),
+                        a.isDisponibile() ? "DISPONIBILE" : "NON DISPONIBILE",
+                        nomeCat
+                    });
+                }
+            }
+        } catch (Exception e) {}
+    }
+
 }
