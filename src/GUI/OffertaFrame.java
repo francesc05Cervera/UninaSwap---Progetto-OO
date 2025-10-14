@@ -1,4 +1,5 @@
 package GUI;
+
 import Controller.OffertaController;
 import Controller.AnnuncioController;
 import entità.Offerta;
@@ -23,8 +24,10 @@ public class OffertaFrame extends JFrame
     private JComboBox<Annuncio> comboAnnunciDisponibili;
     private String currentUsername;
 
-    public OffertaFrame(String username) {
-        if (username == null || username.trim().isEmpty()) {
+    public OffertaFrame(String username) 
+    {
+        if (username == null || username.trim().isEmpty()) 
+        {
             showMsg("Username non valido", "Errore", 0);
             dispose();
             return;
@@ -41,7 +44,8 @@ public class OffertaFrame extends JFrame
         setVisible(true);
     }
 
-    private void initializeGUI() {
+    private void initializeGUI() 
+    {
         JPanel mainPanel = new JPanel(new BorderLayout(0, 0));
         mainPanel.setBackground(new Color(240, 242, 245));
 
@@ -99,7 +103,7 @@ public class OffertaFrame extends JFrame
         centerWrapper.add(splitPane, BorderLayout.CENTER);
         mainPanel.add(centerWrapper, BorderLayout.CENTER);
 
-        // Ora aggiungi qui: aggiornaOfferte(); // <-- AGGIUNGI QUESTA RIGA QUI
+        aggiornaOfferte();
         return mainPanel;
     }
 
