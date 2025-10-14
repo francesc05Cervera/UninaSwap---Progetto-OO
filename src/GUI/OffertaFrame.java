@@ -39,7 +39,7 @@ public class OffertaFrame extends JFrame
         setSize(1300, 750);
         setMinimumSize(new Dimension(1200, 700));
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
         initializeGUI();
         setVisible(true);
     }
