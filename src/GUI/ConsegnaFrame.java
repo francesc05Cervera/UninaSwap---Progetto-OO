@@ -11,6 +11,10 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class ConsegnaFrame extends JFrame {
@@ -174,9 +178,10 @@ public class ConsegnaFrame extends JFrame {
         btnDettagli.addActionListener(e -> visualizzaDettagli(isRicevute));
         btnAggiorna.addActionListener(e -> caricaConsegne());
 
+        // Aggiungi il bottone Modifica SOLO per le consegne da inviare
         if (!isRicevute) {
             JButton btnModifica = createSmallButton("Modifica", themeColor);
-            btnModifica.addActionListener(e -> modificaConsegna());
+            btnModifica.addActionListener(e -> modificaConsegna(false));
             buttonPanel.add(btnModifica);
         }
 
@@ -220,52 +225,35 @@ public class ConsegnaFrame extends JFrame {
     private void caricaConsegne() {
         modelRicevute.setRowCount(0);
         modelInviate.setRowCount(0);
-        
-        // USA I METODI DEL CONTROLLER PER FILTRARE
-        List<Consegna> ricevute = controller.getConsegneDaRicevere(usernameUtente);
-        List<Consegna> inviate = controller.getConsegneDaInviare(usernameUtente, annuncioController);
-        
-        if (ricevute != null) {
-            for (Consegna c : ricevute) {
+        List<Consegna> tutte = controller.listaTutteConsegne();
+        if (tutte != null) {
+            for (Consegna c : tutte) {
                 try {
                     Annuncio ann = annuncioController.cercaPerId(c.getIdAnnuncio());
                     if (ann != null) {
-                        Object[] row = {c.getIdConsegna(), c.getDestinatario(), c.getTipoConsegna(), 
-                                      c.getData(), ann.getTitolo()};
-                        modelRicevute.addRow(row);
+                        // Usa il titolo dell'annuncio invece dell'ID
+                        Object[] row = {c.getIdConsegna(), c.getDestinatario(), c.getTipoConsegna(), c.getData(), ann.getTitolo()};
+                        if (ann.getUsername().equals(usernameUtente)) modelInviate.addRow(row);
+                        else if (c.getDestinatario().equals(usernameUtente)) modelRicevute.addRow(row);
                     }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-        }
-        
-        if (inviate != null) {
-            for (Consegna c : inviate) {
-                try {
-                    Annuncio ann = annuncioController.cercaPerId(c.getIdAnnuncio());
-                    if (ann != null) {
-                        Object[] row = {c.getIdConsegna(), c.getDestinatario(), c.getTipoConsegna(), 
-                                      c.getData(), ann.getTitolo()};
-                        modelInviate.addRow(row);
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+                } catch (Exception ex) {}
             }
         }
     }
 
-    private void modificaConsegna() {
-        int selectedRow = tableInviate.getSelectedRow();
+    private void modificaConsegna(boolean isRicevute) {
+        JTable table = isRicevute ? tableRicevute : tableInviate;
+        DefaultTableModel model = isRicevute ? modelRicevute : modelInviate;
+        int selectedRow = table.getSelectedRow();
         
         if (selectedRow == -1) {
             showMsg("Seleziona una consegna dalla tabella", "Nessuna selezione", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        int idConsegna = (int) modelInviate.getValueAt(selectedRow, 0);
-        Consegna consegna = controller.getConsegnaPerId(idConsegna);
+        int idConsegna = (int) model.getValueAt(selectedRow, 0);
+        List<Consegna> tutte = controller.listaTutteConsegne();
+        Consegna consegna = tutte.stream().filter(c -> c.getIdConsegna() == idConsegna).findFirst().orElse(null);
 
         if (consegna == null) {
             showMsg("Consegna non trovata nel sistema", "Errore", JOptionPane.ERROR_MESSAGE);
@@ -309,9 +297,12 @@ public class ConsegnaFrame extends JFrame {
         cmbTipo.setFont(new Font("SansSerif", Font.PLAIN, 13));
         cmbTipo.setSelectedItem(consegna.getTipoConsegna());
         
-        JTextField txtData = createTextField(consegna.getData().toString());
-        JTextField txtOraInizio = createTextField(consegna.getOraInizioPref() != null ? consegna.getOraInizioPref().toString() : "");
-        JTextField txtOraFine = createTextField(consegna.getOraFinePref() != null ? consegna.getOraFinePref().toString() : "");
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+        
+        JTextField txtData = createTextField(consegna.getData().format(dateFormatter));
+        JTextField txtOraInizio = createTextField(consegna.getOraInizioPref() != null ? consegna.getOraInizioPref().format(timeFormatter) : "");
+        JTextField txtOraFine = createTextField(consegna.getOraFinePref() != null ? consegna.getOraFinePref().format(timeFormatter) : "");
         JTextField txtSedeUni = createTextField(consegna.getSedeUniversitaria() != null ? consegna.getSedeUniversitaria() : "");
         JTextField txtIndirizzo = createTextField(consegna.getIndirizzo() != null ? consegna.getIndirizzo() : "");
         JTextField txtCivico = createTextField(consegna.getCivico() != null ? consegna.getCivico() : "");
@@ -411,29 +402,91 @@ public class ConsegnaFrame extends JFrame {
         buttonPanel.add(btnSalva);
         buttonPanel.add(btnAnnulla);
 
-        // LOGICA SEMPLIFICATA: RACCOGLIE DATI E CHIAMA IL CONTROLLER
         btnSalva.addActionListener(e -> {
-            String errore = controller.validaEModificaConsegna(
-                idConsegna,
-                txtDestinatario.getText(),
-                txtData.getText(),
-                txtOraInizio.getText(),
-                txtOraFine.getText(),
-                (TipoConsegna) cmbTipo.getSelectedItem(),
-                txtSedeUni.getText(),
-                txtIndirizzo.getText(),
-                txtCivico.getText(),
-                txtCorriere.getText(),
-                txtTracking.getText(),
-                txtNote.getText()
-            );
-            
-            if (errore == null) {
-                showMsg("Consegna modificata con successo", "Successo", JOptionPane.INFORMATION_MESSAGE);
-                dialog.dispose();
-                caricaConsegne();
-            } else {
-                showMsg(errore, "Errore", JOptionPane.ERROR_MESSAGE);
+            try {
+                String destinatario = txtDestinatario.getText().trim();
+                if (destinatario.isEmpty()) {
+                    showMsg("Il destinatario è obbligatorio", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                LocalDate dataConsegna;
+                try {
+                    dataConsegna = LocalDate.parse(txtData.getText().trim(), dateFormatter);
+                } catch (DateTimeParseException ex) {
+                    showMsg("Formato data non valido. Usa yyyy-MM-dd", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                if (dataConsegna.isBefore(LocalDate.now())) {
+                    showMsg("La data non può essere nel passato", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                LocalTime oraInizio = null, oraFine = null;
+                String oraInizioStr = txtOraInizio.getText().trim();
+                String oraFineStr = txtOraFine.getText().trim();
+                
+                if (!oraInizioStr.isEmpty() && !oraFineStr.isEmpty()) {
+                    try {
+                        oraInizio = LocalTime.parse(oraInizioStr, timeFormatter);
+                        oraFine = LocalTime.parse(oraFineStr, timeFormatter);
+                        if (!oraInizio.isBefore(oraFine)) {
+                            showMsg("Ora inizio deve essere prima di ora fine", "Errore", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    } catch (DateTimeParseException ex) {
+                        showMsg("Formato ora non valido. Usa HH:mm", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                } else if (!oraInizioStr.isEmpty() || !oraFineStr.isEmpty()) {
+                    showMsg("Inserisci sia ora inizio che fine", "Errore", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                TipoConsegna tipo = (TipoConsegna) cmbTipo.getSelectedItem();
+                
+                if (tipo == TipoConsegna.A_MANO) {
+                    String sedeUni = txtSedeUni.getText().trim();
+                    if (sedeUni.isEmpty()) {
+                        showMsg("Sede universitaria obbligatoria", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    consegna.setSedeUniversitaria(sedeUni);
+                    consegna.setIndirizzo(null);
+                    consegna.setCivico(null);
+                    consegna.setCorriere(null);
+                    consegna.setTrackingNumber(null);
+                } else if (tipo == TipoConsegna.SPEDIZIONE) {
+                    String indirizzo = txtIndirizzo.getText().trim();
+                    String civico = txtCivico.getText().trim();
+                    if (indirizzo.isEmpty() || civico.isEmpty()) {
+                        showMsg("Indirizzo e civico obbligatori", "Errore", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    consegna.setIndirizzo(indirizzo);
+                    consegna.setCivico(civico);
+                    consegna.setCorriere(txtCorriere.getText().trim().isEmpty() ? null : txtCorriere.getText().trim());
+                    consegna.setTrackingNumber(txtTracking.getText().trim().isEmpty() ? null : txtTracking.getText().trim());
+                    consegna.setSedeUniversitaria(null);
+                }
+
+                consegna.setDestinatario(destinatario);
+                consegna.setNoteConsegna(txtNote.getText().trim());
+                consegna.setTipoConsegna(tipo);
+                consegna.setData(dataConsegna);
+                consegna.setOraInizioPref(oraInizio);
+                consegna.setOraFinePref(oraFine);
+
+                if (controller.modificaConsegna(consegna)) {
+                    showMsg("Consegna modificata con successo", "Successo", JOptionPane.INFORMATION_MESSAGE);
+                    dialog.dispose();
+                    caricaConsegne();
+                } else {
+                    showMsg("Errore nella modifica", "Errore", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (Exception ex) {
+                showMsg("Errore: " + ex.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
             }
         });
 
@@ -473,7 +526,8 @@ public class ConsegnaFrame extends JFrame {
         }
 
         int idConsegna = (int) model.getValueAt(selectedRow, 0);
-        Consegna consegna = controller.getConsegnaPerId(idConsegna);
+        List<Consegna> tutte = controller.listaTutteConsegne();
+        Consegna consegna = tutte.stream().filter(c -> c.getIdConsegna() == idConsegna).findFirst().orElse(null);
 
         if (consegna == null) {
             showMsg("Consegna non trovata", "Errore", JOptionPane.ERROR_MESSAGE);
