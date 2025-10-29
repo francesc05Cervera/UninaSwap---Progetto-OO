@@ -8,6 +8,7 @@ import entity.enums.TipoAnnuncio;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.ArrayList;
 
 public class OffertaController {
     private OffertaDAO offertaDAO;
@@ -18,15 +19,43 @@ public class OffertaController {
         this.annuncioDAO = new AnnuncioDAO();
     }
 
-    // Creazione di una nuova offerta
-    public boolean creaOfferta(LocalDate data, TipoAnnuncio tipo, double prezzoProposto, String oggetti, String messaggio, String username, int idAnnuncio, String comeConsegnare) {
+    public String validaECreaOfferta(LocalDate data, TipoAnnuncio tipo, double prezzoProposto, 
+                                      String oggetti, String messaggio, String username, 
+                                      int idAnnuncio, String comeConsegnare) {
         try {
             Annuncio annuncio = annuncioDAO.findByID(idAnnuncio);
-            if (annuncio == null || !annuncio.isDisponibile()) {
-                System.out.println("Annuncio non valido o non disponibile.");
-                return false;
+            if (annuncio == null) {
+                return "Annuncio non trovato";
             }
-
+            
+            if (annuncio.getUsername() != null && annuncio.getUsername().equals(username)) {
+                return "Non puoi fare offerte sui tuoi annunci";
+            }
+            
+            if (!annuncio.isDisponibile()) {
+                return "Annuncio non più disponibile";
+            }
+            
+            List<Offerta> offerteEsistenti = offertaDAO.getAllByAnnuncio(idAnnuncio);
+            for (Offerta o : offerteEsistenti) {
+                if (o.getUsername().equals(username)) {
+                    return "Hai già fatto un'offerta per questo annuncio";
+                }
+            }
+            
+            if (tipo == TipoAnnuncio.VENDITA) {
+                if (prezzoProposto < 0) {
+                    return "Il prezzo non può essere negativo";
+                }
+                if (prezzoProposto < annuncio.getPrezzoOffertaMinima()) {
+                    return "Prezzo minimo richiesto: €" + annuncio.getPrezzoOffertaMinima();
+                }
+            } else if (tipo == TipoAnnuncio.SCAMBIO) {
+                if (oggetti == null || oggetti.trim().isEmpty()) {
+                    return "Devi specificare gli oggetti da scambiare";
+                }
+            }
+            
             Offerta offerta = new Offerta();
             offerta.setDataOff(data);
             offerta.setStatoOfferta(StatoOfferta.IN_SOSPESO);
@@ -41,16 +70,42 @@ public class OffertaController {
             int newID = offertaDAO.insertIntoDB(offerta);
             if (newID > 0) {
                 System.out.println("Offerta creata con ID: " + newID);
-                return true;
+                return null;
             }
-            return false;
+            return "Errore durante la creazione dell'offerta";
+            
         } catch (SQLException ex) {
             ex.printStackTrace();
-            return false;
+            return "Errore di database: " + ex.getMessage();
         }
     }
 
-    // Accetta un'offerta e rifiuta tutte le altre
+    public boolean creaOfferta(LocalDate data, TipoAnnuncio tipo, double prezzoProposto, 
+                               String oggetti, String messaggio, String username, 
+                               int idAnnuncio, String comeConsegnare) {
+        String risultato = validaECreaOfferta(data, tipo, prezzoProposto, oggetti, 
+                                               messaggio, username, idAnnuncio, comeConsegnare);
+        return risultato == null;
+    }
+
+    public List<Offerta> getOfferteRicevutePerUtente(String username) {
+        try {
+            List<Offerta> offerteRicevute = new ArrayList<>();
+            List<Annuncio> annunciUtente = annuncioDAO.cercaAnnunciPerUtente(username);
+            
+            for (Annuncio annuncio : annunciUtente) {
+                List<Offerta> offerteAnnuncio = offertaDAO.getAllByAnnuncio(annuncio.getIdAnnuncio());
+                offerteRicevute.addAll(offerteAnnuncio);
+            }
+            
+            return offerteRicevute;
+            
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
     public boolean accettaOfferta(int idOfferta) {
         try {
             Offerta offerta = offertaDAO.getByID(idOfferta);
@@ -59,10 +114,8 @@ public class OffertaController {
                 return false;
             }
 
-            // Aggiorna stato accettata
             offertaDAO.updateStato(idOfferta, StatoOfferta.ACCETTATA);
 
-            // Rifiuta tutte le altre offerte sullo stesso annuncio
             List<Offerta> tutte = offertaDAO.getAllByAnnuncio(offerta.getIdAnnuncio());
             for (Offerta o : tutte) {
                 if (o.getIdOfferta() != idOfferta) {
@@ -70,7 +123,6 @@ public class OffertaController {
                 }
             }
 
-            // Marca l'annuncio come non disponibile
             Annuncio annuncio = annuncioDAO.findByID(offerta.getIdAnnuncio());
             if (annuncio != null) {
                 annuncio.setDisponibile(false);
@@ -85,7 +137,6 @@ public class OffertaController {
         }
     }
 
-    // Rifiuta un'offerta specifica
     public boolean rifiutaOfferta(int idOfferta) {
         try {
             return offertaDAO.updateStato(idOfferta, StatoOfferta.RIFIUTATA);
@@ -95,7 +146,6 @@ public class OffertaController {
         }
     }
 
-    // Recupera offerte per annuncio
     public List<Offerta> getOffertePerAnnuncio(int idAnnuncio) {
         try {
             return offertaDAO.getAllByAnnuncio(idAnnuncio);
@@ -105,7 +155,6 @@ public class OffertaController {
         }
     }
 
-    // Recupera offerte per utente
     public List<Offerta> getOffertePerUtente(String username) {
         try {
             return offertaDAO.getAllByUsername(username);

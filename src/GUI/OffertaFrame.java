@@ -14,7 +14,6 @@ import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.ArrayList;
 
 public class OffertaFrame extends JFrame 
 {
@@ -369,24 +368,6 @@ public class OffertaFrame extends JFrame
             return;
         }
 
-        if (ann.getUsername() != null && ann.getUsername().equals(currentUsername)) {
-            showMsg("Non puoi offrire sui tuoi annunci", "Errore", 0);
-            return;
-        }
-
-        if (!ann.isDisponibile()) {
-            showMsg("Annuncio non disponibile", "Errore", 0);
-            return;
-        }
-
-        List<Offerta> esistenti = offertaController.getOffertePerAnnuncio(ann.getIdAnnuncio());
-        for (Offerta o : esistenti) {
-            if (o.getUsername().equals(currentUsername)) {
-                showMsg("Hai già fatto un'offerta", "Errore", 0);
-                return;
-            }
-        }
-
         TipoAnnuncio tipo = ann.getTipoAnnuncio();
         double prezzo = 0;
         String oggetti = "";
@@ -399,27 +380,26 @@ public class OffertaFrame extends JFrame
             }
             try {
                 prezzo = Double.parseDouble(p);
-                if (prezzo < 0) {
-                    showMsg("Prezzo negativo", "Errore", 0);
-                    return;
-                }
-                if (prezzo < ann.getPrezzoOffertaMinima()) {
-                    showMsg("Prezzo minimo: €" + ann.getPrezzoOffertaMinima(), "Errore", 0);
-                    return;
-                }
             } catch (Exception ex) {
                 showMsg("Prezzo non valido", "Errore", 0);
                 return;
             }
         } else if (tipo == TipoAnnuncio.SCAMBIO) {
             oggetti = txtOggetti.getText().trim();
-            if (oggetti.isEmpty()) {
-                showMsg("Inserisci oggetti", "Errore", 0);
-                return;
-            }
         }
 
-        if (offertaController.creaOfferta(LocalDate.now(), tipo, prezzo, oggetti, txtMsg.getText() != null ? txtMsg.getText().trim() : "", currentUsername, ann.getIdAnnuncio(), txtCome.getText() != null ? txtCome.getText().trim() : "")) {
+        String risultato = offertaController.validaECreaOfferta(
+            LocalDate.now(), 
+            tipo, 
+            prezzo, 
+            oggetti, 
+            txtMsg.getText() != null ? txtMsg.getText().trim() : "", 
+            currentUsername, 
+            ann.getIdAnnuncio(), 
+            txtCome.getText() != null ? txtCome.getText().trim() : ""
+        );
+
+        if (risultato == null) {
             showMsg("Offerta inviata", "Successo", 1);
             txtPrezzo.setText("");
             txtOggetti.setText("");
@@ -428,7 +408,7 @@ public class OffertaFrame extends JFrame
             caricaAnnunciDisponibili();
             aggiornaOfferte();
         } else {
-            showMsg("Errore invio", "Errore", 0);
+            showMsg(risultato, "Errore", 0);
         }
     }
 
@@ -436,37 +416,32 @@ public class OffertaFrame extends JFrame
         DefaultTableModel modelInv = (DefaultTableModel) tabellaOfferteInviate.getModel();
         modelInv.setRowCount(0);
         List<Offerta> inv = offertaController.getOffertePerUtente(currentUsername);
-        for (Offerta o : inv) {
-            modelInv.addRow(new Object[]{
-                    o.getIdOfferta(),
-                    "Ann. " + o.getIdAnnuncio(),
-                    o.getPrezzoProposto() == 0 ? "N/A" : "€" + o.getPrezzoProposto(),
-                    o.getStatoOfferta(),
-                    o.getDataOff()
-            });
+        if (inv != null) {
+            for (Offerta o : inv) {
+                modelInv.addRow(new Object[]{
+                        o.getIdOfferta(),
+                        "Ann. " + o.getIdAnnuncio(),
+                        o.getPrezzoProposto() == 0 ? "N/A" : "€" + o.getPrezzoProposto(),
+                        o.getStatoOfferta(),
+                        o.getDataOff()
+                });
+            }
         }
 
         DefaultTableModel modelRic = (DefaultTableModel) tabellaOfferteRicevute.getModel();
         modelRic.setRowCount(0);
-        try {
-            List<Annuncio> miei = new ArrayList<>();
-            for (Annuncio a : annuncioController.mostraTuttiAnnunci()) {
-                if (a.getUsername() != null && a.getUsername().equals(currentUsername)) {
-                    miei.add(a);
-                }
+        List<Offerta> ric = offertaController.getOfferteRicevutePerUtente(currentUsername);
+        if (ric != null) {
+            for (Offerta o : ric) {
+                modelRic.addRow(new Object[]{
+                        o.getIdOfferta(),
+                        "Ann. " + o.getIdAnnuncio() + " da " + o.getUsername(),
+                        o.getPrezzoProposto() == 0 ? "N/A" : "€" + o.getPrezzoProposto(),
+                        o.getStatoOfferta(),
+                        o.getDataOff()
+                });
             }
-            for (Annuncio a : miei) {
-                for (Offerta o : offertaController.getOffertePerAnnuncio(a.getIdAnnuncio())) {
-                    modelRic.addRow(new Object[]{
-                            o.getIdOfferta(),
-                            "Ann. " + o.getIdAnnuncio() + " da " + o.getUsername(),
-                            o.getPrezzoProposto() == 0 ? "N/A" : "€" + o.getPrezzoProposto(),
-                            o.getStatoOfferta(),
-                            o.getDataOff()
-                    });
-                }
-            }
-        } catch (Exception e) {}
+        }
     }
 
     private void visualizzaDettagliOfferta(boolean isInv) {
@@ -477,7 +452,11 @@ public class OffertaFrame extends JFrame
             return;
         }
         int id = (int) t.getValueAt(r, 0);
-        List<Offerta> lista = isInv ? offertaController.getOffertePerUtente(currentUsername) : getAllOfferteRicevute();
+        List<Offerta> lista = isInv ? offertaController.getOffertePerUtente(currentUsername) : offertaController.getOfferteRicevutePerUtente(currentUsername);
+        if (lista == null) {
+            showMsg("Errore caricamento dati", "Errore", 0);
+            return;
+        }
         Offerta off = lista.stream().filter(o -> o.getIdOfferta() == id).findFirst().orElse(null);
         if (off == null) {
             showMsg("Offerta non trovata", "Errore", 0);
@@ -513,7 +492,11 @@ public class OffertaFrame extends JFrame
             return;
         }
         int id = (int) tabellaOfferteRicevute.getValueAt(r, 0);
-        List<Offerta> ric = getAllOfferteRicevute();
+        List<Offerta> ric = offertaController.getOfferteRicevutePerUtente(currentUsername);
+        if (ric == null) {
+            showMsg("Errore caricamento dati", "Errore", 0);
+            return;
+        }
         Offerta off = ric.stream().filter(o -> o.getIdOfferta() == id).findFirst().orElse(null);
         if (off == null || off.getStatoOfferta() != StatoOfferta.IN_SOSPESO) {
             showMsg("Offerta non gestibile", "Errore", 0);
@@ -530,27 +513,14 @@ public class OffertaFrame extends JFrame
         }
     }
 
-    private List<Offerta> getAllOfferteRicevute() {
-        List<Offerta> res = new ArrayList<>();
-        try {
-            List<Annuncio> miei = new ArrayList<>();
-            for (Annuncio a : annuncioController.mostraTuttiAnnunci()) {
-                if (a.getUsername() != null && a.getUsername().equals(currentUsername)) {
-                    miei.add(a);
-                }
-            }
-            for (Annuncio a : miei) {
-                res.addAll(offertaController.getOffertePerAnnuncio(a.getIdAnnuncio()));
-            }
-        } catch (Exception e) {}
-        return res;
-    }
-
     private void caricaAnnunciDisponibili() {
         comboAnnunciDisponibili.removeAllItems();
-        for (Annuncio a : annuncioController.mostraTuttiAnnunci()) {
-            if (a.isDisponibile() && a.getUsername() != null && !a.getUsername().equals(currentUsername)) {
-                comboAnnunciDisponibili.addItem(a);
+        List<Annuncio> tutti = annuncioController.mostraTuttiAnnunci();
+        if (tutti != null) {
+            for (Annuncio a : tutti) {
+                if (a.isDisponibile() && a.getUsername() != null && !a.getUsername().equals(currentUsername)) {
+                    comboAnnunciDisponibili.addItem(a);
+                }
             }
         }
         if (comboAnnunciDisponibili.getItemCount() == 0) {
